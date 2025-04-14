@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Extension Settings</title>
+    <style>
+        body { font-family: sans-serif; padding: 10px; width: 300px; }
+        label { display: block; margin-top: 10px; }
+        input[type="text"], input[type="email"], textarea { width: 95%; }
+        button { margin-top: 15px; }
+        #status { margin-top: 10px; color: green; }
+    </style>
+</head>
+<body>
+    <h2>Your Information</h2>
+    <p>This info will be used to attempt autofilling.</p>
+
+    <label for="firstName">First Name:</label>
+    <input type="text" id="firstName">
+
+    <label for="lastName">Last Name:</label>
+    <input type="text" id="lastName">
+
+    <label for="email">Email:</label>
+    <input type="email" id="email">
+
+    <label for="phone">Phone:</label>
+    <input type="text" id="phone">
+
+    <button id="save">Save Information</button>
+    <div id="status"></div>
+
+    <script src="options.js"></script>
+</body>
+</html>
