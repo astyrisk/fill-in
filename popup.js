@@ -1,57 +1,53 @@
+// Popup script for form filling extension
+
 document.addEventListener('DOMContentLoaded', () => {
     const triggerButton = document.getElementById('triggerFillButton');
     const statusDisplay = document.getElementById('status');
-    // const optionsLink = document.getElementById('optionsLink'); // If needed
+    console.log("popup.js loaded");
 
     if (triggerButton) {
         triggerButton.addEventListener('click', () => {
+            console.log("triggerFillButton clicked");
+
             statusDisplay.textContent = 'Attempting to fill...';
 
-            // Find the active tab
+            // First check if we're on a LinkedIn page
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 const activeTab = tabs[0];
-                if (activeTab && activeTab.id) {
-                     // Send a message TO the content script running in that tab
-                     // NOTE: The content script (content.js) needs a listener for this message!
+
+                if (!activeTab || !activeTab.id) {
+                    statusDisplay.textContent = 'Error: Could not find active tab.';
+                    console.error("Popup Error: No active tab found.");
+                    return;
+                }
+
+                // No need to check for specific websites anymore as we support all sites
+
+                // Try to inject the content script if it's not already there
+                chrome.scripting.executeScript({
+                    target: { tabId: activeTab.id },
+                    files: ['content.js']
+                }).then(() => {
+                    // Now try to send the message
                     chrome.tabs.sendMessage(
                         activeTab.id,
-                        { action: "triggerAutofillFromPopup" }, // Define this action in content.js
+                        { action: "triggerAutofillFromPopup" },
                         (response) => {
-                            // Handle response from content script (if it sends one)
                             if (chrome.runtime.lastError) {
-                                // Handle errors like no content script listening
                                 statusDisplay.textContent = 'Error: Cannot connect to page.';
                                 console.error("Popup Error:", chrome.runtime.lastError.message);
                             } else if (response && response.status) {
                                 statusDisplay.textContent = `Status: ${response.status}`;
                             } else {
-                                statusDisplay.textContent = 'Action requested.'; // Default if no response
+                                statusDisplay.textContent = 'Action requested.';
                             }
                         }
                     );
-                } else {
-                    statusDisplay.textContent = 'Error: Could not find active tab.';
-                     console.error("Popup Error: No active tab found.");
-                }
+                }).catch(err => {
+                    statusDisplay.textContent = 'Error: Could not inject content script.';
+                    console.error("Script injection error:", err);
+                });
             });
         });
     }
-
-    // Optional: Add any other initialization logic for the popup here
-    // For example, checking if the user has saved settings yet.
 });
-
-// --- IMPORTANT ---
-// You will need to ADD a message listener inside your `content.js` file
-// to receive the "triggerAutofillFromPopup" message and call your
-// `tryAutoFill()` function when it's received.
-// Example to add in content.js:
-/*
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "triggerAutofillFromPopup") {
-    console.log("Autofill triggered from popup.");
-    tryAutoFill(); // Call your existing function
-    sendResponse({ status: "Autofill initiated" }); // Optional: send confirmation back
-  }
-});
-*/

@@ -4,34 +4,43 @@
   "version": "0.1.0",
   "description": "fills in job applications",
   "permissions": [
-    "storage", 
-    "scripting", 
-    "tabs" 
+    "storage",
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
-    "*://*.linkedin.com/*" 
+    "<all_urls>"
   ],
   "background": {
-    "service_worker": "background.js" 
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["*://*.linkedin.com/jobs/view/*", "*://*.linkedin.com/jobs/collections/*"], 
-      "js": ["content.js"] 
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
     }
   ],
-  "options_page": "options.html", 
+  "options_page": "options.html",
   "action": {
     "default_popup": "popup.html",
-    "default_icon": { 
+    "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
   },
-  "icons": { 
+  "icons": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
+  },
+  "commands": {
+    "trigger-autofill": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+F",
+        "mac": "Command+Shift+F"
+      },
+      "description": "Trigger form auto-fill"
+    }
   }
 }

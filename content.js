@@ -1,4 +1,4 @@
-console.log("LinkedIn Helper Content Script Loaded");
+console.log("Content Script Loaded");
 
 // --- Helper Function to Fill Input ---
 // Tries to find an element and fill it, returns true if successful
@@ -37,54 +37,65 @@ function tryAutoFill() {
 
     console.log("Retrieved user data:", userData);
 
-    // 2. Find and fill form fields (THE HARD PART - REQUIRES REAL SELECTORS)
-    // These selectors are PLACEHOLDERS - you MUST find the correct ones by
-    // inspecting the LinkedIn Easy Apply form HTML structure.
-    // They WILL change over time. Look for stable attributes like 'id', 'name',
-    // 'aria-label', or sometimes specific 'data-*' attributes. Avoid relying solely on CSS classes.
+    // 2. Find and fill form fields using common selectors that work across most websites
 
-    // Example structure for Easy Apply (HIGHLY LIKELY TO BE INCORRECT/OUTDATED):
-    fillInput('input[id*="firstName"]', userData.firstName); // Example: input with id containing "firstName"
-    fillInput('input[id*="lastName"]', userData.lastName);
-    fillInput('input[type="email"]', userData.email); // Might be prefilled by LinkedIn
-    fillInput('input[type="tel"]', userData.phone); // Phone format might need checking
+    // Try multiple selector patterns for each field type
+    // First name field - try various common selectors
+    const firstNameFilled =
+      fillInput('input[id*="first_name"]', userData.firstName) ||
+      fillInput('input[id*="firstName"]', userData.firstName) ||
+      fillInput('input[name*="first_name"]', userData.firstName) ||
+      fillInput('input[name*="firstName"]', userData.firstName) ||
+      fillInput('input[placeholder*="First name"]', userData.firstName) ||
+      fillInput('input[placeholder*="first name"]', userData.firstName) ||
+      fillInput('input[aria-label*="First name"]', userData.firstName);
 
-    // Example for a custom question (extremely difficult to generalize)
-    // fillInput('textarea[aria-label*="experience"]', "My relevant experience is...");
+    // Last name field - try various common selectors
+    const lastNameFilled =
+      fillInput('input[id*="last_name"]', userData.lastName) ||
+      fillInput('input[id*="lastName"]', userData.lastName) ||
+      fillInput('input[name*="last_name"]', userData.lastName) ||
+      fillInput('input[name*="lastName"]', userData.lastName) ||
+      fillInput('input[placeholder*="Last name"]', userData.lastName) ||
+      fillInput('input[placeholder*="last name"]', userData.lastName) ||
+      fillInput('input[aria-label*="Last name"]', userData.lastName);
 
-    // Handling Radio Buttons/Checkboxes (Example)
-    // try {
-    //   const yesRadio = document.querySelector('input[type="radio"][value="Yes"][name*="workAuthorization"]'); // Placeholder selector
-    //   if (yesRadio) {
-    //     yesRadio.click();
-    //     console.log("Clicked 'Yes' radio button");
-    //   }
-    // } catch (e) { console.error("Error clicking radio", e); }
+    // Email field - try various common selectors
+    const emailFilled =
+      fillInput('input[type="email"]', userData.email) ||
+      fillInput('input[id*="email"]', userData.email) ||
+      fillInput('input[name*="email"]', userData.email) ||
+      fillInput('input[placeholder*="Email"]', userData.email) ||
+      fillInput('input[placeholder*="email"]', userData.email) ||
+      fillInput('input[aria-label*="Email"]', userData.email);
 
-    // Handling Dropdowns (Example)
-    // try {
-    //    const dropdown = document.querySelector('select[id*="country"]'); // Placeholder selector
-    //    if(dropdown && userData.countryCode) {
-    //        dropdown.value = userData.countryCode; // e.g., "US"
-    //        dropdown.dispatchEvent(new Event('change', { bubbles: true }));
-    //        console.log("Selected country dropdown");
-    //    }
-    // } catch(e) { console.error("Error selecting dropdown", e); }
+    // Phone field - try various common selectors
+    const phoneFilled =
+      fillInput('input[type="tel"]', userData.phone) ||
+      fillInput('input[id*="phone"]', userData.phone) ||
+      fillInput('input[name*="phone"]', userData.phone) ||
+      fillInput('input[placeholder*="Phone"]', userData.phone) ||
+      fillInput('input[placeholder*="phone"]', userData.phone) ||
+      fillInput('input[aria-label*="Phone"]', userData.phone);
 
-    // 3. Find 'Next' or 'Submit' buttons (USE EXTREME CAUTION WITH AUTO-SUBMIT)
-    // It's generally safer to just fill the fields and let the user click submit.
-    // const nextButton = document.querySelector('button[aria-label*="Next"]'); // Placeholder
-    // const submitButton = document.querySelector('button[aria-label*="Submit application"]'); // Placeholder
+    // Log results
+    console.log("Fields filled - First name:", firstNameFilled, "Last name:", lastNameFilled,
+               "Email:", emailFilled, "Phone:", phoneFilled);
 
-    // if (nextButton) {
-    //    console.log("Found 'Next' button. Consider clicking it manually.");
-    //    // nextButton.click(); // Uncomment cautiously
-    // } else if (submitButton) {
-    //     console.log("Found 'Submit' button. VERY CAREFUL! Review before submitting.");
-    //    // submitButton.click(); // Uncomment VERY cautiously
-    // } else {
-    //    console.log("Could not find Next or Submit button with current selectors.");
-    // }
+    // Try to fill name field if first and last name weren't filled separately
+    if (!firstNameFilled && !lastNameFilled) {
+      const fullName = `${userData.firstName} ${userData.lastName}`.trim();
+      if (fullName) {
+        const nameFilled =
+          fillInput('input[id*="name"]', fullName) ||
+          fillInput('input[name*="name"]', fullName) ||
+          fillInput('input[placeholder*="Name"]', fullName) ||
+          fillInput('input[placeholder*="name"]', fullName) ||
+          fillInput('input[aria-label*="Name"]', fullName);
+
+        console.log("Full name field filled:", nameFilled);
+      }
+    }
 
     console.log("Autofill attempt finished.");
   });
@@ -100,7 +111,7 @@ function addButton() {
     if(document.getElementById('autofill-trigger-button')) return; // Don't add multiple buttons
 
     const button = document.createElement('button');
-    button.textContent = 'Autofill My Info';
+    button.textContent = 'Fill Form';
     button.id = 'autofill-trigger-button';
     button.style.position = 'fixed';
     button.style.top = '10px';
@@ -118,44 +129,65 @@ function addButton() {
     document.body.appendChild(button);
 }
 
-// Add the button only on pages that look like job application forms
-// This check is very basic - improve it for reliability
-if (window.location.href.includes('/jobs/view/')) {
-   // Wait a bit for the page elements to likely exist
-   window.setTimeout(addButton, 1500);
+// Add the button on pages that might have forms
+// Check if the page has any input fields that might be part of a form
+function checkForFormFields() {
+  const formElements = document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], textarea');
+  return formElements.length > 0;
 }
 
+// Wait for the page to load, then check if it has form fields
+window.setTimeout(() => {
+  if (checkForFormFields()) {
+    addButton();
+  } else {
+    console.log("No form fields detected on this page.");
+  }
+}, 1500);
 
-// --- Optional: Find Job Links on Search Pages ---
-// (This part would run on job search results pages, based on manifest `matches`)
-function findAndMarkJobLinks() {
-    // Placeholder selector for job links on a search results page
-    const jobLinks = document.querySelectorAll('a[href*="/jobs/view/"]');
-    console.log(`Found ${jobLinks.length} potential job links.`);
 
-    jobLinks.forEach(link => {
-        // Example: Add a button next to each link to open it via background script
-        const openButton = document.createElement('button');
-        openButton.textContent = 'Open';
-        openButton.style.marginLeft = '10px';
-        openButton.style.fontSize = '0.8em';
-        openButton.onclick = (e) => {
-            e.preventDefault(); // Prevent default link navigation
-            e.stopPropagation(); // Stop event bubbling
-            console.log(`Requesting to open: ${link.href}`);
-            chrome.runtime.sendMessage(
-                { action: "openJobTab", url: link.href },
-                (response) => {
-                    console.log("Background script response:", response);
-                }
-            );
-        };
-        // Try inserting the button nicely (might need specific selectors depending on page structure)
-        link.parentNode.insertBefore(openButton, link.nextSibling);
-    });
-}
+// This extension now focuses on general form filling across all websites
 
-if (window.location.href.includes('/jobs/collections/')) {
-   // Wait a bit before trying to find links
-   window.setTimeout(findAndMarkJobLinks, 2000);
+
+// Add this at the end of content.js
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+  if (request.action === "triggerAutofillFromPopup") {
+    console.log("Autofill triggered from popup or keyboard shortcut.");
+
+    // Show a temporary notification to the user
+    showNotification("Auto-filling form fields...");
+
+    // Call the autofill function
+    tryAutoFill();
+
+    sendResponse({ status: "Autofill initiated" });
+  }
+  return true; // Keep the message channel open for async response
+});
+
+// Function to show a temporary notification
+function showNotification(message) {
+  // Create notification element
+  const notification = document.createElement('div');
+  notification.textContent = message;
+  notification.style.position = 'fixed';
+  notification.style.top = '20px';
+  notification.style.left = '50%';
+  notification.style.transform = 'translateX(-50%)';
+  notification.style.backgroundColor = '#4CAF50';
+  notification.style.color = 'white';
+  notification.style.padding = '10px 20px';
+  notification.style.borderRadius = '5px';
+  notification.style.zIndex = '10000';
+  notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+
+  // Add to page
+  document.body.appendChild(notification);
+
+  // Remove after 3 seconds
+  setTimeout(() => {
+    if (notification && notification.parentNode) {
+      notification.parentNode.removeChild(notification);
+    }
+  }, 3000);
 }

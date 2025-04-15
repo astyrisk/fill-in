@@ -48,3 +48,23 @@ a:hover {
     color: #555;
     min-height: 1.2em; /* Prevent layout shift when text changes */
 }
+
+.shortcut-tip {
+    font-size: 12px;
+    color: #666;
+    margin-top: 8px;
+}
+
+kbd {
+    background-color: #f7f7f7;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.2);
+    color: #333;
+    display: inline-block;
+    font-size: 0.85em;
+    font-weight: bold;
+    line-height: 1;
+    padding: 2px 4px;
+    white-space: nowrap;
+}
