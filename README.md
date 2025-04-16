@@ -4,30 +4,23 @@ chromium-based (Manifest V3) extension to filter related jobs from linked-in and
 *This is a work in progress.*
 
 ## Supported Fields
-- First Name
-- Last Name
-- Email
-- Phone
+- First Name, Last Name, Email, Phone, City, State, Country/Current location, Zip Code, LinkedIn URL, GitHub URL, Portfolio URL, work authorization status, salary expectations, current notice period, available to start.
+- Resume - Not implemented yet
 
-- City
-- State
-- Country/Current location
-- Zip Code
 
-- LinkedIn URL
-- GitHub URL
-- Portfolio URL
+## works on the following
+- https://jobs.lever.co/instructure/8218b205-0c5c-4cc7-99a6-6ba4befec9ab/apply?source=LinkedIn
+- https://careers.zenitech.co.uk/jobs/5454808-java-software-engineer/applications/new
 
-- work authorization status
-- salary expectations
-- current notice period
-- available to start
-- Are you related to anyone
 
-- Resume
+
+## It breaks on the following
+- https://jobs.jobvite.com/ef-education-first/job/oOLQvfwE/apply?nl=1
+- https://avisbudget.wd1.myworkdayjobs.com/en-US/ABG_Careers/job/Budapest-Service-Centre/Automation-Developer_R0174498?src=LinkedIn
+- https://www.avisbudgetgroup.jobs/automation-developer/job/PAF-ABG-F95C890E-C277-4DA5-B6BF-C7274376CDA1_8392_1743186690_0?src=LinkedIn
 
 ## Supported Sites
-- General form filling 
+- General form filling - Implemented
 - Myworkday - Not implemented yet 
 - jobs.lever.co - Not implemented yet
 

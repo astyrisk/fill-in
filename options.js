@@ -4,7 +4,28 @@ function saveOptions() {
   const lastName = document.getElementById('lastName').value;
   const email = document.getElementById('email').value;
   const phone = document.getElementById('phone').value;
-  // Get other fields...
+
+  // Location fields
+  const city = document.getElementById('city').value;
+  const state = document.getElementById('state').value;
+  const country = document.getElementById('country').value;
+  const zipCode = document.getElementById('zipCode').value;
+
+  // Social & Portfolio fields
+  const linkedinUrl = document.getElementById('linkedinUrl').value;
+  const githubUrl = document.getElementById('githubUrl').value;
+  const portfolioUrl = document.getElementById('portfolioUrl').value;
+
+  // Employment Details fields
+  const workAuth = document.getElementById('workAuth').value;
+  const visaSponsorship = document.getElementById('visaSponsorship').value;
+  const salaryExpectations = document.getElementById('salaryExpectations').value;
+  const noticePeriod = document.getElementById('noticePeriod').value;
+  const availableToStart = document.getElementById('availableToStart').value;
+
+  // Additional Information fields
+  const englishFluency = document.getElementById('englishFluency').value;
+  const relatedToAnyone = document.getElementById('relatedToAnyone').value;
 
   chrome.storage.sync.set(
     {
@@ -13,7 +34,24 @@ function saveOptions() {
         lastName: lastName,
         email: email,
         phone: phone,
-        // Add other fields...
+        // Location data
+        city: city,
+        state: state,
+        country: country,
+        zipCode: zipCode,
+        // Social & Portfolio data
+        linkedinUrl: linkedinUrl,
+        githubUrl: githubUrl,
+        portfolioUrl: portfolioUrl,
+        // Employment Details data
+        workAuth: workAuth,
+        visaSponsorship: visaSponsorship,
+        salaryExpectations: salaryExpectations,
+        noticePeriod: noticePeriod,
+        availableToStart: availableToStart,
+        // Additional Information data
+        englishFluency: englishFluency,
+        relatedToAnyone: relatedToAnyone
       }
     },
     () => {
@@ -39,7 +77,28 @@ function restoreOptions() {
         document.getElementById('lastName').value = items.userData.lastName || '';
         document.getElementById('email').value = items.userData.email || '';
         document.getElementById('phone').value = items.userData.phone || '';
-        // Set other fields...
+
+        // Restore location fields
+        document.getElementById('city').value = items.userData.city || '';
+        document.getElementById('state').value = items.userData.state || '';
+        document.getElementById('country').value = items.userData.country || '';
+        document.getElementById('zipCode').value = items.userData.zipCode || '';
+
+        // Restore social & portfolio fields
+        document.getElementById('linkedinUrl').value = items.userData.linkedinUrl || '';
+        document.getElementById('githubUrl').value = items.userData.githubUrl || '';
+        document.getElementById('portfolioUrl').value = items.userData.portfolioUrl || '';
+
+        // Restore employment details fields
+        document.getElementById('workAuth').value = items.userData.workAuth || '';
+        document.getElementById('visaSponsorship').value = items.userData.visaSponsorship || '';
+        document.getElementById('salaryExpectations').value = items.userData.salaryExpectations || '';
+        document.getElementById('noticePeriod').value = items.userData.noticePeriod || '';
+        document.getElementById('availableToStart').value = items.userData.availableToStart || '';
+
+        // Restore additional information fields
+        document.getElementById('englishFluency').value = items.userData.englishFluency || '';
+        document.getElementById('relatedToAnyone').value = items.userData.relatedToAnyone || '';
       }
     }
   );

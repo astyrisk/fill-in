@@ -28,6 +28,93 @@
     <label for="phone">Phone:</label>
     <input type="text" id="phone">
 
+    <h3>Location</h3>
+    <label for="city">City:</label>
+    <input type="text" id="city">
+
+    <label for="state">State:</label>
+    <input type="text" id="state">
+
+    <label for="country">Country/Current Location:</label>
+    <input type="text" id="country">
+
+    <label for="zipCode">Zip Code:</label>
+    <input type="text" id="zipCode">
+
+    <h3>Social & Portfolio</h3>
+    <label for="linkedinUrl">LinkedIn URL:</label>
+    <input type="text" id="linkedinUrl">
+
+    <label for="githubUrl">GitHub URL:</label>
+    <input type="text" id="githubUrl">
+
+    <label for="portfolioUrl">Portfolio URL:</label>
+    <input type="text" id="portfolioUrl">
+
+    <h3>Employment Details</h3>
+    <label for="workAuth">Work Authorization Status:</label>
+    <select id="workAuth">
+        <option value="">Select an option</option>
+        <optgroup label="United States">
+            <option value="US Citizen">US Citizen</option>
+            <option value="Green Card Holder">Green Card Holder</option>
+            <option value="H1B Visa">H1B Visa</option>
+            <option value="F1 Visa/OPT">F1 Visa/OPT</option>
+            <option value="TN Visa">TN Visa</option>
+            <option value="EAD">EAD</option>
+        </optgroup>
+        <optgroup label="Europe">
+            <option value="EU Citizen">EU Citizen</option>
+            <option value="EU Blue Card">EU Blue Card</option>
+            <option value="UK Citizen">UK Citizen</option>
+            <option value="UK Skilled Worker Visa">UK Skilled Worker Visa</option>
+            <option value="UK Global Talent Visa">UK Global Talent Visa</option>
+            <option value="EU Work Permit">EU Work Permit</option>
+            <option value="I am a non-EU citizen and currently require a work permit to work in Hungary">Non-EU Citizen with Hungary Work Permit</option>
+        </optgroup>
+        <optgroup label="Other">
+            <option value="Authorized in Current Country">Authorized in Current Country</option>
+            <option value="International Applicant">International Applicant</option>
+            <option value="Other">Other</option>
+        </optgroup>
+    </select>
+
+    <label for="visaSponsorship">Visa Sponsorship Required:</label>
+    <select id="visaSponsorship">
+        <option value="">Select an option</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+        <option value="Not Applicable">Not Applicable</option>
+    </select>
+
+    <label for="salaryExpectations">Salary Expectations:</label>
+    <input type="text" id="salaryExpectations" placeholder="e.g., $80,000 - $100,000">
+
+    <label for="noticePeriod">Current Notice Period:</label>
+    <select id="noticePeriod">
+        <option value="">Select an option</option>
+        <option value="Immediately">Immediately</option>
+        <option value="1 week">1 week</option>
+        <option value="2 weeks">2 weeks</option>
+        <option value="3 weeks">3 weeks</option>
+        <option value="1 month">1 month</option>
+        <option value="More than 1 month">More than 1 month</option>
+    </select>
+
+    <label for="availableToStart">Available to Start:</label>
+    <input type="text" id="availableToStart" placeholder="e.g., Immediately, 2 weeks, MM/DD/YYYY">
+
+    <h3>Additional Information</h3>
+    <label for="englishFluency">English Fluency:</label>
+    <select id="englishFluency">
+        <option value="">Select an option</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+    </select>
+
+    <label for="relatedToAnyone">Are you related to anyone at the company?</label>
+    <textarea id="relatedToAnyone" placeholder="If yes, please provide details. If no, type 'No'."></textarea>
+
     <button id="save">Save Information</button>
     <div id="status"></div>
 
