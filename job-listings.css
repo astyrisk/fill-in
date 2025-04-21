@@ -1,0 +1,145 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f3f2ef;
+}
+
+.container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1 {
+    color: #0073b1;
+    margin-bottom: 20px;
+}
+
+.filters {
+    display: flex;
+    margin-bottom: 20px;
+    gap: 10px;
+    align-items: center;
+}
+
+.filter-options {
+    display: flex;
+    gap: 15px;
+    margin-right: 10px;
+}
+
+.filter-options label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+#search-input {
+    flex-grow: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+button {
+    background-color: #0073b1;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #005582;
+}
+
+.job-card {
+    background-color: white;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.job-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.job-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #0073b1;
+    flex-grow: 1;
+}
+
+.job-badges {
+    display: flex;
+    gap: 5px;
+}
+
+.job-badge {
+    font-size: 12px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    color: white;
+}
+
+.job-badge.easy-apply {
+    background-color: #0a66c2;
+}
+
+.job-badge.promoted {
+    background-color: #057642;
+}
+
+.job-company {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.job-location {
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.job-insight {
+    color: #057642;
+    font-size: 14px;
+    margin-bottom: 12px;
+    padding: 5px 0;
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+}
+
+.job-id {
+    color: #999;
+    font-size: 12px;
+    margin-left: auto;
+}
+
+.job-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.apply-button {
+    background-color: #0073b1;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.apply-button:hover {
+    background-color: #005582;
+}

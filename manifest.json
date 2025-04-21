@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Fill in",
-  "version": "0.1.0",
-  "description": "fills in job applications",
+  "version": "0.2.0",
+  "description": "Fills in job applications",
   "permissions": [
     "storage",
     "scripting",
-    "tabs"
+    "tabs",
+    "webRequest"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -49,5 +50,11 @@
       },
       "description": "Trigger form auto-fill"
     }
-  }
+  },
+    "web_accessible_resources": [
+    {
+      "resources": ["job-listings.html", "job-listings.css", "job-listings.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

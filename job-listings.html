@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn Job Listings</title>
+    <link rel="stylesheet" href="job-listings.css">
+</head>
+<body>
+    <div class="container">
+        <h1>LinkedIn Job Listings</h1>
+        <p id="scrape-info">Loading job listings...</p>
+
+        <div class="filters">
+            <input type="text" id="search-input" placeholder="Search jobs...">
+            <div class="filter-options">
+                <label>
+                    <input type="checkbox" id="filter-easy-apply"> Easy Apply Only
+                </label>
+            </div>
+            <button id="refresh-button">Refresh Data</button>
+        </div>
+
+        <div id="job-listings-container">
+            <!-- Job listings will be inserted here -->
+        </div>
+    </div>
+
+    <script src="job-listings.js"></script>
+</body>
+</html>
