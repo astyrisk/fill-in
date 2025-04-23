@@ -5,8 +5,121 @@
 
 console.log("LinkedIn Scraper loaded");
 
+// Function to scroll to the bottom of the page to load all job listings
+async function scrollToBottom() {
+    console.log("Starting to scroll to load all job listings...");
+
+    // Get the job list container - try different selectors for different LinkedIn layouts
+    let jobListContainer = document.querySelector('.jobs-search-results-list');
+
+    // If the primary selector doesn't work, try alternative selectors
+    if (!jobListContainer) {
+        // Try alternative selectors for different LinkedIn layouts
+        const alternativeSelectors = [
+            '.scaffold-layout__list', // Another common container
+            '.jobs-search-results',
+            '.jobs-search-two-pane__results',
+            '.jobs-search-results-list__container',
+            // If none of the above work, use the main content area
+            'main',
+            // Last resort - use document.body
+            'body'
+        ];
+
+        for (const selector of alternativeSelectors) {
+            jobListContainer = document.querySelector(selector);
+            if (jobListContainer) {
+                console.log(`Found job container using alternative selector: ${selector}`);
+                break;
+            }
+        }
+    }
+
+    if (!jobListContainer) {
+        console.warn("Could not find any suitable job list container, using document.body");
+        jobListContainer = document.body; // Last resort
+    }
+
+    // Try to find job cards with different selectors
+    const jobCardSelectors = [
+        'li.scaffold-layout__list-item', // Primary selector
+        '.job-card-container', // Alternative selector
+        '.jobs-search-results__list-item',
+        '.job-card-list',
+        '.jobs-search-result-item'
+    ];
+
+    // Function to get job count using multiple selectors
+    function getJobCount() {
+        for (const selector of jobCardSelectors) {
+            const count = document.querySelectorAll(selector).length;
+            if (count > 0) {
+                return { count, selector };
+            }
+        }
+        return { count: 0, selector: null };
+    }
+
+    // Initial job count
+    const initialJobData = getJobCount();
+    let previousJobCount = initialJobData.count;
+    const jobCardSelector = initialJobData.selector || 'li.scaffold-layout__list-item'; // Fallback to default if none found
+
+    console.log(`Initial job count: ${previousJobCount} using selector: ${jobCardSelector}`);
+
+    // Scroll down in increments and wait for new content to load
+    let scrollAttempts = 0;
+    const maxScrollAttempts = 20; // Limit scrolling attempts to prevent infinite loops
+    let noNewJobsCounter = 0;
+
+    while (scrollAttempts < maxScrollAttempts) {
+        // Try different scrolling methods
+        // Method 1: Using scrollTop property
+        jobListContainer.scrollTop = jobListContainer.scrollHeight;
+
+        // Method 2: Using scrollTo method
+        jobListContainer.scrollTo(0, jobListContainer.scrollHeight);
+
+        // Method 3: Using window.scrollTo for the entire page
+        window.scrollTo(0, document.body.scrollHeight);
+
+        // Method 4: Using scrollIntoView on the last job card
+        const allCards = document.querySelectorAll('li.scaffold-layout__list-item');
+        if (allCards && allCards.length > 0) {
+            allCards[allCards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+
+        // Wait for potential new content to load
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Check if new jobs were loaded using the same selector we found initially
+        const currentJobCount = document.querySelectorAll(jobCardSelector).length;
+        console.log(`Current job count after scrolling: ${currentJobCount} using selector: ${jobCardSelector}`);
+
+        if (currentJobCount > previousJobCount) {
+            // New jobs loaded, reset counter
+            previousJobCount = currentJobCount;
+            noNewJobsCounter = 0;
+        } else {
+            // No new jobs loaded, increment counter
+            noNewJobsCounter++;
+
+            // If no new jobs loaded after 3 consecutive attempts, assume we've reached the end
+            if (noNewJobsCounter >= 3) {
+                console.log("No new jobs loaded after multiple scroll attempts. Assuming all jobs are loaded.");
+                break;
+            }
+        }
+
+        scrollAttempts++;
+    }
+
+    console.log(`Finished scrolling. Total jobs loaded: ${document.querySelectorAll(jobCardSelector).length} using selector: ${jobCardSelector}`);
+    return { success: true, jobCardSelector };
+}
+
 // Function to scrape job listings from the current page
-function scrapeLinkedInJobs() {
+async function scrapeLinkedInJobs() {
     console.log("Starting LinkedIn jobs scraping");
 
     // Check if we're on a LinkedIn jobs page
@@ -15,9 +128,17 @@ function scrapeLinkedInJobs() {
         return { status: "Error: Not on a LinkedIn jobs page" };
     }
 
+    // First scroll to load all job listings
+    console.log("Scrolling to load all job listings before scraping...");
+    const scrollResult = await scrollToBottom();
+
     try {
-        // Find all job cards on the page - updated selector to match current LinkedIn structure
-        const jobCards = document.querySelectorAll('li.scaffold-layout__list-item');
+        // Use the job card selector that was successful during scrolling
+        const jobCardSelector = scrollResult.jobCardSelector || 'li.scaffold-layout__list-item';
+        console.log(`Using job card selector for scraping: ${jobCardSelector}`);
+
+        // Find all job cards on the page using the determined selector
+        const jobCards = document.querySelectorAll(jobCardSelector);
 
         if (!jobCards || jobCards.length === 0) {
             console.warn("No job cards found on the page");
@@ -150,8 +271,13 @@ function scrapeLinkedInJobs() {
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     if (request.action === "scrapeLinkedInJobs") {
         console.log("Received scrape request");
-        const result = scrapeLinkedInJobs();
-        sendResponse(result);
+        // Use async/await pattern with Promise to handle the async scraping function
+        scrapeLinkedInJobs().then(result => {
+            sendResponse(result);
+        }).catch(error => {
+            console.error("Error during scraping:", error);
+            sendResponse({ status: "Error during scraping" });
+        });
     } else if (request.action === "checkScraperLoaded") {
         // Respond to confirm the script is loaded
         sendResponse({ loaded: true });

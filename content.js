@@ -476,7 +476,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 // Initialize the extension
 window.setTimeout(() => {
   if (checkForFormFields()) {
-    addButton(tryAutoFill);
+    // addButton(tryAutoFill);
 
     // Check if this is an Angular form
     if (isAngularForm()) {

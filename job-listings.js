@@ -33,9 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Display scrape timestamp
+            // Display scrape timestamp and job count
             const scrapeDate = new Date(data.scrapeTimestamp);
-            scrapeInfo.textContent = `${data.linkedInJobs.length} jobs scraped on ${scrapeDate.toLocaleString()}`;
+            scrapeInfo.textContent = `${data.linkedInJobs.length} jobs scraped on ${scrapeDate.toLocaleString()} (includes all scrolled content)`;
 
             // Render job listings
             renderJobListings(data.linkedInJobs);
