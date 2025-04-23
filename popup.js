@@ -2,8 +2,8 @@
 
 // Function to send scrape message to the content script
 function sendScrapeMessage(tabId, statusDisplay) {
-    // Update status to inform user about scrolling process
-    statusDisplay.textContent = 'Status: Scrolling to load all job listings...';
+    // Update status to inform user about the process
+    statusDisplay.textContent = 'Status: Navigating to first page and preparing to scrape...';
 
     // Send message to trigger scraping
     chrome.tabs.sendMessage(

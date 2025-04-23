@@ -119,36 +119,20 @@ async function scrollToBottom() {
 }
 
 // Function to scrape job listings from the current page
-async function scrapeLinkedInJobs() {
-    console.log("Starting LinkedIn jobs scraping");
-
-    // Check if we're on a LinkedIn jobs page
-    if (!window.location.href.includes('linkedin.com/jobs')) {
-        console.error("Not on a LinkedIn jobs page");
-        return { status: "Error: Not on a LinkedIn jobs page" };
-    }
-
-    // First scroll to load all job listings
-    console.log("Scrolling to load all job listings before scraping...");
-    const scrollResult = await scrollToBottom();
-
+async function scrapeCurrentPage(jobCardSelector) {
     try {
-        // Use the job card selector that was successful during scrolling
-        const jobCardSelector = scrollResult.jobCardSelector || 'li.scaffold-layout__list-item';
-        console.log(`Using job card selector for scraping: ${jobCardSelector}`);
-
         // Find all job cards on the page using the determined selector
         const jobCards = document.querySelectorAll(jobCardSelector);
 
         if (!jobCards || jobCards.length === 0) {
             console.warn("No job cards found on the page");
-            return { status: "No job listings found" };
+            return [];
         }
 
-        console.log(`Found ${jobCards.length} job listings`);
+        console.log(`Found ${jobCards.length} job listings on current page`);
 
         // Extract data from each job card
-        const jobListings = Array.from(jobCards).map(card => {
+        return Array.from(jobCards).map(card => {
             // Get job title - updated selector
             const titleElement = card.querySelector('.job-card-list__title--link');
             let title = titleElement ? titleElement.textContent.trim() : 'Unknown Title';
@@ -217,10 +201,224 @@ async function scrapeLinkedInJobs() {
                 applicationInsight
             };
         });
+    } catch (error) {
+        console.error("Error scraping current page:", error);
+        return [];
+    }
+}
 
+// Function to find and click the next page button
+async function clickNextPageButton() {
+    try {
+        // Try different selectors for the next page button
+        const nextButtonSelectors = [
+            // '.jobs-search-pagination__button--next', // Primary selector
+            'button[aria-label="View next page"]',
+            // '.artdeco-pagination__button--next',
+            // '.artdeco-button--icon-right'
+        ];
 
+        let nextButton = null;
+        for (const selector of nextButtonSelectors) {
+            nextButton = document.querySelector(selector);
+            if (nextButton) {
+                console.log(`Found next page button using selector: ${selector}`);
+                break;
+            }
+        }
+
+        if (!nextButton) {
+            console.log("No next page button found. This might be the last page.");
+            return false;
+        }
+
+        // Check if the button is disabled
+        if (nextButton.disabled || nextButton.getAttribute('aria-disabled') === 'true' ||
+            nextButton.classList.contains('artdeco-button--disabled')) {
+            console.log("Next page button is disabled. This is the last page.");
+            return false;
+        }
+
+        // Click the next page button
+        console.log("Clicking next page button...");
+        nextButton.click();
+
+        // Wait for the page to load
+        console.log("Waiting for next page to load...");
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for page to load
+
+        // Additional check to ensure the page has loaded
+        let loadingAttempts = 0;
+        const maxLoadingAttempts = 10;
+
+        while (loadingAttempts < maxLoadingAttempts) {
+            // Check if there's a loading indicator and wait if there is
+            const loadingIndicator = document.querySelector('.artdeco-loader');
+            if (!loadingIndicator) {
+                break; // No loading indicator, assume page is loaded
+            }
+
+            console.log("Page still loading, waiting...");
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            loadingAttempts++;
+        }
+
+        console.log("Next page loaded successfully");
+        return true;
+    } catch (error) {
+        console.error("Error clicking next page button:", error);
+        return false;
+    }
+}
+
+// Function to navigate through all pages and scrape job listings
+async function navigateAndScrapeAllPages(jobCardSelector) {
+    let allJobListings = [];
+    let currentPage = 1;
+    const maxPages = 20; // Limit to prevent infinite loops
+
+    console.log(`Starting to scrape page ${currentPage}...`);
+
+    // Scrape the first page
+    const firstPageJobs = await scrapeCurrentPage(jobCardSelector);
+    allJobListings = [...firstPageJobs];
+
+    console.log(`Scraped ${firstPageJobs.length} jobs from page ${currentPage}`);
+
+    // Navigate through subsequent pages
+    while (currentPage < maxPages) {
+        // Try to click the next page button
+        const hasNextPage = await clickNextPageButton();
+
+        if (!hasNextPage) {
+            console.log(`No more pages available after page ${currentPage}`);
+            break;
+        }
+
+        currentPage++;
+        console.log(`Navigated to page ${currentPage}`);
+
+        // Scroll to load all job listings on this page
+        await scrollToBottom();
+
+        // Scrape the current page
+        console.log(`Scraping page ${currentPage}...`);
+        const pageJobs = await scrapeCurrentPage(jobCardSelector);
+
+        if (pageJobs.length === 0) {
+            console.log(`No jobs found on page ${currentPage}, might be an error. Stopping pagination.`);
+            break;
+        }
+
+        // Add jobs from this page to the total
+        allJobListings = [...allJobListings, ...pageJobs];
+        console.log(`Scraped ${pageJobs.length} jobs from page ${currentPage}. Total jobs so far: ${allJobListings.length}`);
+    }
+
+    console.log(`Finished scraping all pages. Total jobs collected: ${allJobListings.length}`);
+    return allJobListings;
+}
+
+// Function to find and click the first page button
+async function clickFirstPageButton() {
+    try {
+        console.log("Attempting to navigate to the first page...");
+
+        // Try different selectors for the first page button
+        const firstPageButtonSelectors = [
+            'button[aria-label="Page 1"]',
+            '.jobs-search-pagination__indicator-button[aria-current="page"]',
+            '.jobs-search-pagination__indicator:first-child button',
+            'button.jobs-search-pagination__indicator-button--active'
+        ];
+
+        let firstPageButton = null;
+        for (const selector of firstPageButtonSelectors) {
+            firstPageButton = document.querySelector(selector);
+            if (firstPageButton) {
+                console.log(`Found first page button using selector: ${selector}`);
+                break;
+            }
+        }
+
+        if (!firstPageButton) {
+            console.log("No first page button found. We might already be on the first page.");
+            return true; // Assume we're already on the first page
+        }
+
+        // Check if the button is already active (we're already on the first page)
+        if (firstPageButton.getAttribute('aria-current') === 'page' ||
+            firstPageButton.classList.contains('jobs-search-pagination__indicator-button--active')) {
+            console.log("Already on the first page.");
+            return true;
+        }
+
+        // Click the first page button
+        console.log("Clicking first page button...");
+        firstPageButton.click();
+
+        // Wait for the page to load
+        console.log("Waiting for first page to load...");
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for page to load
+
+        // Additional check to ensure the page has loaded
+        let loadingAttempts = 0;
+        const maxLoadingAttempts = 10;
+
+        while (loadingAttempts < maxLoadingAttempts) {
+            // Check if there's a loading indicator and wait if there is
+            const loadingIndicator = document.querySelector('.artdeco-loader');
+            if (!loadingIndicator) {
+                break; // No loading indicator, assume page is loaded
+            }
+
+            console.log("Page still loading, waiting...");
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            loadingAttempts++;
+        }
+
+        console.log("First page loaded successfully");
+        return true;
+    } catch (error) {
+        console.error("Error clicking first page button:", error);
+        return false; // Continue with scraping even if navigation to first page fails
+    }
+}
+
+// Main function to scrape LinkedIn jobs
+async function scrapeLinkedInJobs() {
+    console.log("Starting LinkedIn jobs scraping");
+
+    // Check if we're on a LinkedIn jobs page
+    if (!window.location.href.includes('linkedin.com/jobs')) {
+        console.error("Not on a LinkedIn jobs page");
+        return { status: "Error: Not on a LinkedIn jobs page" };
+    }
+
+    try {
+        // First navigate to the first page
+        console.log("Navigating to the first page before starting scraping...");
+        await clickFirstPageButton();
+
+        // Then scroll to load all job listings on the current page
+        console.log("Scrolling to load all job listings on the current page...");
+        const scrollResult = await scrollToBottom();
+
+        // Use the job card selector that was successful during scrolling
+        const jobCardSelector = scrollResult.jobCardSelector || 'li.scaffold-layout__list-item';
+        console.log(`Using job card selector for scraping: ${jobCardSelector}`);
+
+        // Navigate through all pages and scrape job listings
+        const allJobListings = await navigateAndScrapeAllPages(jobCardSelector);
+
+        if (allJobListings.length === 0) {
+            console.warn("No job listings found across all pages");
+            return { status: "No job listings found" };
+        }
+
+        // Store the scraped data in chrome.storage
         chrome.storage.local.set({
-            linkedInJobs: jobListings,
+            linkedInJobs: allJobListings,
             scrapeTimestamp: new Date().toISOString()
         }, () => {
             console.log("Job listings saved to storage");
@@ -245,22 +443,7 @@ async function scrapeLinkedInJobs() {
             });
         });
 
-
-        // Store the scraped data in chrome.storage
-        // chrome.storage.local.set({
-        //     linkedInJobs: jobListings,
-        //     scrapeTimestamp: new Date().toISOString()
-        // }, () => {
-        //     console.log("Job listings saved to storage");
-
-        //     // Open the results page
-        //     chrome.runtime.sendMessage({
-        //         action: "openJobTab",
-        //         url: chrome.runtime.getURL("job-listings.html")
-        //     });
-        // });
-
-        return { status: `Scraped ${jobListings.length} job listings` };
+        return { status: `Scraped ${allJobListings.length} job listings from multiple pages` };
     } catch (error) {
         console.error("Error scraping LinkedIn jobs:", error);
         return { status: "Error scraping job listings" };
