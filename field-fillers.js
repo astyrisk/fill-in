@@ -1,6 +1,6 @@
 /**
  * Fill-In Extension - Field Fillers
- * 
+ *
  * Functions for filling different types of form fields.
  */
 
@@ -17,9 +17,38 @@ function fillInput(selector, value) {
       console.log(`Element not found for selector: ${selector}`);
       return false;
     }
-    
+
     if (!value) return false;
-    
+
+    // Handle React select components
+    if (element.classList.contains('select__input')) {
+      // For React select components, we need to handle them differently
+      const selectContainer = element.closest('.select__container');
+      if (selectContainer) {
+        // Click on the select to open the dropdown
+        const selectControl = selectContainer.querySelector('.select__control');
+        if (selectControl) {
+          selectControl.click();
+
+          // Wait a bit for the dropdown to open
+          setTimeout(() => {
+            // Try to find and click the option that matches our value
+            const options = document.querySelectorAll('.select__option');
+            for (const option of options) {
+              if (option.textContent.toLowerCase().includes(value.toLowerCase())) {
+                option.click();
+                console.log(`Selected option '${option.textContent}' in React select`);
+                return;
+              }
+            }
+          }, 300);
+
+          return true;
+        }
+      }
+    }
+
+    // Standard input handling
     element.value = value;
     triggerInputEvents(element);
     console.log(`Filled field '${selector}'`);
@@ -43,10 +72,63 @@ function fillInputByLabel(labelText, value) {
       if (!input) console.warn(`Input not found for label text: ${labelText}`);
       return false;
     }
-    
-    input.value = value;
-    triggerInputEvents(input);
-    console.log(`Filled field with label '${labelText}'`);
+
+    // Handle React select components
+    if (input.classList.contains('select__input')) {
+      // For React select components, we need to handle them differently
+      const selectContainer = input.closest('.select__container');
+      if (selectContainer) {
+        // Click on the select to open the dropdown
+        const selectControl = selectContainer.querySelector('.select__control');
+        if (selectControl) {
+          selectControl.click();
+
+          // Wait a bit for the dropdown to open
+          setTimeout(() => {
+            // Try to find and click the option that matches our value
+            const options = document.querySelectorAll('.select__option');
+            for (const option of options) {
+              if (option.textContent.toLowerCase().includes(value.toLowerCase())) {
+                option.click();
+                console.log(`Selected option '${option.textContent}' in React select for label '${labelText}'`);
+                return;
+              }
+            }
+          }, 500); // Increased timeout for slower pages
+
+          return true;
+        }
+      }
+
+      // Special handling for the "How did you hear about" dropdown
+      if (labelText.toLowerCase().includes('how did you hear')) {
+        // Try to find the dropdown button and click it
+        const dropdownButton = document.querySelector('.select__control .icon-button');
+        if (dropdownButton) {
+          dropdownButton.click();
+
+          // Wait a bit for the dropdown to open
+          setTimeout(() => {
+            // Try to find and click the option that matches our value
+            const options = document.querySelectorAll('.select__option');
+            for (const option of options) {
+              if (option.textContent.toLowerCase().includes(value.toLowerCase())) {
+                option.click();
+                console.log(`Selected option '${option.textContent}' in dropdown for '${labelText}'`);
+                return;
+              }
+            }
+          }, 500); // Increased timeout for slower pages
+
+          return true;
+        }
+      }
+    } else {
+      // Standard input handling
+      input.value = value;
+      triggerInputEvents(input);
+      console.log(`Filled field with label '${labelText}'`);
+    }
     return true;
   } catch (error) {
     console.error(`Error filling field with label '${labelText}':`, error);
@@ -76,7 +158,7 @@ function selectRadioByLabel(containerSelectorOrElement, optionText) {
     }
 
     const labels = Array.from(container.querySelectorAll('label'));
-    
+
     // Try exact match first
     for (const label of labels) {
       if (label.textContent.trim() === optionText) {
@@ -142,6 +224,72 @@ function fillTextareaByLabel(labelText, value) {
     return fillInputByLabel(labelText, value);
   } catch (error) {
     console.error(`Error filling textarea with label '${labelText}':`, error);
+    return false;
+  }
+}
+
+/**
+ * Checks a checkbox by its label text
+ * @param {string} labelText - Text content of the label
+ * @returns {boolean} - True if successful, false otherwise
+ */
+function checkCheckboxByLabel(labelText) {
+  try {
+    // First try to find the GDPR consent checkbox directly
+    const gdprCheckbox = document.querySelector('#gdpr_processing_consent_given_1');
+    if (gdprCheckbox && !gdprCheckbox.checked && !gdprCheckbox.disabled) {
+      gdprCheckbox.checked = true;
+      triggerInputEvents(gdprCheckbox);
+      console.log(`Checked GDPR consent checkbox directly`);
+      return true;
+    }
+
+    // Find all labels that might match
+    const labels = Array.from(document.querySelectorAll('label'));
+    for (const label of labels) {
+      if (label.textContent.toLowerCase().includes(labelText.toLowerCase())) {
+        // Find the associated checkbox
+        let checkbox = null;
+
+        // Check if the label has a 'for' attribute
+        if (label.htmlFor) {
+          checkbox = document.getElementById(label.htmlFor);
+        }
+
+        // If not found by 'for', check if it's inside the label
+        if (!checkbox) {
+          checkbox = label.querySelector('input[type="checkbox"]');
+        }
+
+        // If still not found, check if it's a sibling
+        if (!checkbox) {
+          const wrapper = label.closest('.checkbox__wrapper');
+          if (wrapper) {
+            checkbox = wrapper.querySelector('input[type="checkbox"]');
+          }
+        }
+
+        // If still not found, try to find it in the parent container
+        if (!checkbox) {
+          const container = label.closest('.checkbox');
+          if (container) {
+            checkbox = container.querySelector('input[type="checkbox"]');
+          }
+        }
+
+        if (checkbox && !checkbox.checked && !checkbox.disabled) {
+          checkbox.checked = true;
+          triggerInputEvents(checkbox);
+          console.log(`Checked checkbox with label '${labelText}'`);
+          return true;
+        }
+      }
+    }
+
+    console.warn(`Checkbox with label '${labelText}' not found or already checked`);
+    return false;
+  } catch (error) {
+    console.error(`Error checking checkbox with label '${labelText}':`, error);
     return false;
   }
 }

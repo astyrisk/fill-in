@@ -1,6 +1,6 @@
 /**
  * Fill-In Extension - Content Script
- * 
+ *
  * Main entry point for the extension's content script.
  * This script automatically fills in form fields on web pages using user data
  * stored in Chrome's sync storage.
@@ -31,51 +31,131 @@ function tryAutoFill() {
 
     console.log("Retrieved user data:", userData);
 
-    // 2. Find and fill form fields using common selectors that work across most websites
-    
-    // Personal information fields
-    const firstNameFilled = fillPersonalInfoFields(userData);
-    const lastNameFilled = fillLastNameFields(userData);
-    const emailFilled = fillEmailFields(userData);
-    const phoneFilled = fillPhoneFields(userData);
-    
-    // Location fields
-    const cityFilled = fillCityFields(userData);
-    const stateFilled = fillStateFields(userData);
-    const countryFilled = fillCountryFields(userData);
-    const zipFilled = fillZipCodeFields(userData);
-    
-    // Social profile fields
-    const linkedinFilled = fillLinkedInFields(userData, firstNameFilled);
-    const githubFilled = fillGitHubFields(userData);
-    const portfolioFilled = fillPortfolioFields(userData);
-    
-    // Employment details fields
-    const workAuthFilled = fillWorkAuthFields(userData);
-    const visaSponsorshipFilled = fillVisaSponsorshipFields(userData);
-    const salaryFilled = fillSalaryFields(userData);
-    const noticePeriodFilled = fillNoticePeriodFields(userData);
-    const availableToStartFilled = fillAvailableToStartFields(userData);
-    
-    // Handle specific form fields
-    const citizenshipFilled = handleCitizenshipFields(userData);
-    const salaryHufFilled = fillSalaryHufFields(userData);
-    const specificNoticePeriodFilled = fillSpecificNoticePeriodFields(userData);
-    const englishFluencyFilled = handleEnglishFluencyFields(userData);
-    const relatedToAnyoneFilled = fillRelatedToAnyoneFields(userData);
+    // Check if this is the specific form we're trying to fix
+    const isSpecificForm = document.querySelector('.application--form') !== null;
 
-    // Log results
-    logFilledFields({
-      firstNameFilled, lastNameFilled, emailFilled, phoneFilled,
-      cityFilled, stateFilled, countryFilled, zipFilled,
-      linkedinFilled, githubFilled, portfolioFilled,
-      workAuthFilled, visaSponsorshipFilled, salaryFilled, noticePeriodFilled, availableToStartFilled,
-      citizenshipFilled, salaryHufFilled, specificNoticePeriodFilled, englishFluencyFilled, relatedToAnyoneFilled
-    });
+    if (isSpecificForm) {
+      console.log("Detected specific application form, using direct selectors");
 
-    // Try to fill name field if first and last name weren't filled separately
-    if (!firstNameFilled && !lastNameFilled) {
-      fillFullNameField(userData);
+      // Direct fill approach for the specific form
+      const directFills = [
+        { selector: '#first_name', value: userData.firstName },
+        { selector: '#last_name', value: userData.lastName },
+        { selector: '#email', value: userData.email },
+        { selector: '#phone', value: userData.phone },
+        { selector: '#question_7483945005', value: userData.linkedinUrl },
+        { selector: '#question_7483946005', value: userData.portfolioUrl }
+      ];
+
+      // Fill each field directly
+      directFills.forEach(field => {
+        if (field.value) {
+          const element = document.querySelector(field.selector);
+          if (element) {
+            element.value = field.value;
+            triggerInputEvents(element);
+            console.log(`Directly filled ${field.selector} with ${field.value}`);
+          } else {
+            console.warn(`Could not find element with selector ${field.selector}`);
+          }
+        }
+      });
+
+      // Handle the dropdown
+      setTimeout(() => {
+        const dropdownButton = document.querySelector('.select__control .icon-button');
+        if (dropdownButton) {
+          dropdownButton.click();
+          console.log("Clicked dropdown button");
+
+          // Wait for dropdown to open
+          setTimeout(() => {
+            const options = document.querySelectorAll('.select__option');
+            let optionClicked = false;
+            for (const option of options) {
+              if (option.textContent.includes('Other')) {
+                option.click();
+                console.log("Selected 'Other' option");
+                optionClicked = true;
+                break;
+              }
+            }
+
+            if (!optionClicked && options.length > 0) {
+              // If 'Other' not found, click the first option
+              options[0].click();
+              console.log(`Selected first option: ${options[0].textContent}`);
+            }
+          }, 500);
+        }
+      }, 500);
+
+      // Check the GDPR consent checkbox
+      setTimeout(() => {
+        const gdprCheckbox = document.querySelector('#gdpr_processing_consent_given_1');
+        if (gdprCheckbox && !gdprCheckbox.checked && !gdprCheckbox.disabled) {
+          gdprCheckbox.checked = true;
+          triggerInputEvents(gdprCheckbox);
+          console.log("Checked GDPR consent checkbox");
+        }
+      }, 1000);
+
+      console.log("Direct form filling completed");
+    } else {
+      // Standard approach for other forms
+      // 2. Find and fill form fields using common selectors that work across most websites
+
+      // Personal information fields
+      const firstNameFilled = fillPersonalInfoFields(userData);
+      const lastNameFilled = fillLastNameFields(userData);
+      const emailFilled = fillEmailFields(userData);
+      const phoneFilled = fillPhoneFields(userData);
+
+      // Location fields
+      const cityFilled = fillCityFields(userData);
+      const stateFilled = fillStateFields(userData);
+      const countryFilled = fillCountryFields(userData);
+      const zipFilled = fillZipCodeFields(userData);
+
+      // Social profile fields
+      const linkedinFilled = fillLinkedInFields(userData, firstNameFilled);
+      const githubFilled = fillGitHubFields(userData);
+      const portfolioFilled = fillPortfolioFields(userData);
+
+      // Employment details fields
+      const workAuthFilled = fillWorkAuthFields(userData);
+      const visaSponsorshipFilled = fillVisaSponsorshipFields(userData);
+      const salaryFilled = fillSalaryFields(userData);
+      const noticePeriodFilled = fillNoticePeriodFields(userData);
+      const availableToStartFilled = fillAvailableToStartFields(userData);
+
+      // Handle specific form fields
+      const citizenshipFilled = handleCitizenshipFields(userData);
+      const salaryHufFilled = fillSalaryHufFields(userData);
+      const specificNoticePeriodFilled = fillSpecificNoticePeriodFields(userData);
+      const englishFluencyFilled = handleEnglishFluencyFields(userData);
+      const relatedToAnyoneFilled = fillRelatedToAnyoneFields(userData);
+
+      // Handle consent checkboxes
+      const gdprConsentChecked = checkCheckboxByLabel('I agree to allow');
+
+      // Handle React select components
+      const howDidYouHearFilled = fillInputByLabel('How did you hear about', 'Other');
+
+      // Log results
+      logFilledFields({
+        firstNameFilled, lastNameFilled, emailFilled, phoneFilled,
+        cityFilled, stateFilled, countryFilled, zipFilled,
+        linkedinFilled, githubFilled, portfolioFilled,
+        workAuthFilled, visaSponsorshipFilled, salaryFilled, noticePeriodFilled, availableToStartFilled,
+        citizenshipFilled, salaryHufFilled, specificNoticePeriodFilled, englishFluencyFilled, relatedToAnyoneFilled,
+        gdprConsentChecked, howDidYouHearFilled
+      });
+
+      // Try to fill name field if first and last name weren't filled separately
+      if (!firstNameFilled && !lastNameFilled) {
+        fillFullNameField(userData);
+      }
     }
 
     console.log("Autofill attempt finished.");
@@ -188,14 +268,16 @@ function fillLinkedInFields(userData, firstNameFilled) {
     console.log("Skipping LinkedIn URL fill until first name is filled");
     return false;
   }
-  
-  return fillInput('input[id*="linkedin"]', userData.linkedinUrl) ||
+
+  return fillInput('input#question_7483945005', userData.linkedinUrl) ||
+    fillInput('input[id*="linkedin"]', userData.linkedinUrl) ||
     fillInput('input[name*="linkedin"]', userData.linkedinUrl) ||
     fillInput('input[name="urls[LinkedIn]"]', userData.linkedinUrl) ||
     fillInput('input[placeholder*="LinkedIn"]', userData.linkedinUrl) ||
     fillInput('input[placeholder*="linkedin"]', userData.linkedinUrl) ||
     fillInput('input[aria-label*="LinkedIn"]', userData.linkedinUrl) ||
     fillInputByLabel('LinkedIn URL', userData.linkedinUrl) ||
+    fillInputByLabel('LinkedIn Profile', userData.linkedinUrl) ||
     fillInputByLabel('LinkedIn', userData.linkedinUrl);
 }
 
@@ -213,7 +295,8 @@ function fillGitHubFields(userData) {
 }
 
 function fillPortfolioFields(userData) {
-  return fillInput('input[id*="portfolio"]', userData.portfolioUrl) ||
+  return fillInput('input#question_7483946005', userData.portfolioUrl) ||
+    fillInput('input[id*="portfolio"]', userData.portfolioUrl) ||
     fillInput('input[name*="portfolio"]', userData.portfolioUrl) ||
     fillInput('input[name="urls[Portfolio]"]', userData.portfolioUrl) ||
     fillInput('input[placeholder*="Portfolio"]', userData.portfolioUrl) ||
@@ -225,6 +308,7 @@ function fillPortfolioFields(userData) {
     fillInput('input[placeholder*="website"]', userData.portfolioUrl) ||
     fillInput('input[aria-label*="Website"]', userData.portfolioUrl) ||
     fillInputByLabel('Portfolio URL', userData.portfolioUrl) ||
+    fillInputByLabel('Link to online portfolio', userData.portfolioUrl) ||
     fillInputByLabel('Portfolio', userData.portfolioUrl) ||
     fillInputByLabel('Website', userData.portfolioUrl) ||
     fillInputByLabel('Personal website', userData.portfolioUrl) ||
@@ -323,7 +407,7 @@ function fillAvailableToStartFields(userData) {
 
 function fillSalaryHufFields(userData) {
   if (!userData.salaryExpectations) return false;
-  
+
   return fillInput('input[name*="salary"][placeholder="Type your response"]', userData.salaryExpectations) ||
     fillInput('input[name="cards[4cdd9b69-f47d-43bf-9fa5-5ca6aab388a2][field2]"]', userData.salaryExpectations) ||
     fillInputByLabel('salary expectations', userData.salaryExpectations) ||
@@ -332,7 +416,7 @@ function fillSalaryHufFields(userData) {
 
 function fillSpecificNoticePeriodFields(userData) {
   if (!userData.noticePeriod && !userData.availableToStart) return false;
-  
+
   const noticeValue = userData.noticePeriod || userData.availableToStart;
   return fillInput('input[name="cards[4cdd9b69-f47d-43bf-9fa5-5ca6aab388a2][field3]"]', noticeValue) ||
     fillInputByLabel('notice period', noticeValue) ||
@@ -341,7 +425,7 @@ function fillSpecificNoticePeriodFields(userData) {
 
 function fillRelatedToAnyoneFields(userData) {
   if (!userData.relatedToAnyone) return false;
-  
+
   return fillTextareaByLabel('related to anyone', userData.relatedToAnyone) ||
     fillInput('textarea[name="cards[4cdd9b69-f47d-43bf-9fa5-5ca6aab388a2][field4]"]', userData.relatedToAnyone);
 }
@@ -349,7 +433,7 @@ function fillRelatedToAnyoneFields(userData) {
 function fillFullNameField(userData) {
   const fullName = `${userData.firstName} ${userData.lastName}`.trim();
   if (!fullName) return false;
-  
+
   const nameFilled =
     fillInput('input[id*="name"]', fullName) ||
     fillInput('input[name*="name"]', fullName) ||
@@ -373,6 +457,7 @@ function logFilledFields(fields) {
   console.log("Specific form fields filled - Citizenship:", fields.citizenshipFilled, "Salary HUF:", fields.salaryHufFilled,
              "Specific Notice Period:", fields.specificNoticePeriodFilled, "English Fluency:", fields.englishFluencyFilled,
              "Related to Anyone:", fields.relatedToAnyoneFilled);
+  console.log("Form-specific fields - GDPR Consent:", fields.gdprConsentChecked, "How Did You Hear:", fields.howDidYouHearFilled);
 }
 
 // --- Event Listeners and Initialization ---

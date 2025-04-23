@@ -1,6 +1,6 @@
 /**
  * Fill-In Extension - Form Element Finders
- * 
+ *
  * Functions for finding form elements on the page.
  */
 
@@ -12,7 +12,7 @@
 function findInputByLabelText(labelText) {
   try {
     const normalizedLabelText = labelText.toLowerCase();
-    
+
     // Method 1: Look for standard label elements
     const labels = Array.from(document.querySelectorAll('label'));
     for (const label of labels) {
@@ -48,6 +48,20 @@ function findInputByLabelText(labelText) {
             if (input) return input;
           }
         }
+
+        // Check for React form structure with input-wrapper
+        const inputWrapper = label.closest('.input-wrapper');
+        if (inputWrapper) {
+          const input = inputWrapper.querySelector('input, select, textarea');
+          if (input) return input;
+        }
+
+        // Check for React select component
+        const selectContainer = label.closest('.select__container');
+        if (selectContainer) {
+          const selectInput = selectContainer.querySelector('.select__input');
+          if (selectInput) return selectInput;
+        }
       }
     }
 
@@ -68,6 +82,10 @@ function findInputByLabelText(labelText) {
             const nestedInput = nextSibling.querySelector('input');
             if (nestedInput) return nestedInput;
           }
+
+          // Check for React select component
+          const selectInput = parent.querySelector('.select__input');
+          if (selectInput) return selectInput;
         }
       }
     }
@@ -88,29 +106,33 @@ function findInputByLabelText(labelText) {
 function findSpecificFieldByLabelType(normalizedLabelText) {
   // First name field
   if (normalizedLabelText.includes('first name') || normalizedLabelText === 'first') {
-    const field = document.querySelector('.JVA_NAME input[autocomplete="given-name"]') || 
-                  document.querySelector('input[autocomplete="given-name"]');
+    const field = document.querySelector('.JVA_NAME input[autocomplete="given-name"]') ||
+                  document.querySelector('input[autocomplete="given-name"]') ||
+                  document.querySelector('input#first_name');
     if (field) return field;
   }
 
   // Last name field
   if (normalizedLabelText.includes('last name') || normalizedLabelText === 'last') {
     const field = document.querySelector('.JVA_NAME input[autocomplete="family-name"]') ||
-                  document.querySelector('input[autocomplete="family-name"]');
+                  document.querySelector('input[autocomplete="family-name"]') ||
+                  document.querySelector('input#last_name');
     if (field) return field;
   }
 
   // Email field
   if (normalizedLabelText.includes('email')) {
     const field = document.querySelector('.JVA_EMAIL input[autocomplete="email"]') ||
-                  document.querySelector('input[autocomplete="email"]');
+                  document.querySelector('input[autocomplete="email"]') ||
+                  document.querySelector('input#email');
     if (field) return field;
   }
 
   // Phone field
   if (normalizedLabelText.includes('phone')) {
     const field = document.querySelector('.JVA_PHONE input[autocomplete="tel"]') ||
-                  document.querySelector('input[autocomplete="tel"]');
+                  document.querySelector('input[autocomplete="tel"]') ||
+                  document.querySelector('input#phone');
     if (field) return field;
   }
 
@@ -125,6 +147,56 @@ function findSpecificFieldByLabelType(normalizedLabelText) {
     const field = document.querySelector('select[autocomplete="country-name"]') ||
                   document.querySelector('input[autocomplete="country-name"]');
     if (field) return field;
+  }
+
+  // LinkedIn profile field
+  if (normalizedLabelText.includes('linkedin')) {
+    // Try to find by ID first
+    const field = document.querySelector('input#question_7483945005');
+    if (field) return field;
+
+    // If not found by ID, try to find by label
+    const labels = Array.from(document.querySelectorAll('label'));
+    for (const label of labels) {
+      if (label.textContent.toLowerCase().includes('linkedin profile')) {
+        if (label.htmlFor) {
+          const linkedinField = document.getElementById(label.htmlFor);
+          if (linkedinField) return linkedinField;
+        }
+      }
+    }
+  }
+
+  // Portfolio field
+  if (normalizedLabelText.includes('portfolio') || normalizedLabelText.includes('website')) {
+    // Try to find by ID first
+    const field = document.querySelector('input#question_7483946005');
+    if (field) return field;
+
+    // If not found by ID, try to find by label
+    const labels = Array.from(document.querySelectorAll('label'));
+    for (const label of labels) {
+      if (label.textContent.toLowerCase().includes('portfolio') ||
+          label.textContent.toLowerCase().includes('website')) {
+        if (label.htmlFor) {
+          const portfolioField = document.getElementById(label.htmlFor);
+          if (portfolioField) return portfolioField;
+        }
+      }
+    }
+  }
+
+  // How did you hear about field
+  if (normalizedLabelText.includes('how did you hear')) {
+    const labels = Array.from(document.querySelectorAll('label'));
+    for (const label of labels) {
+      if (label.textContent.toLowerCase().includes('how did you hear')) {
+        if (label.htmlFor) {
+          const selectField = document.getElementById(label.htmlFor);
+          if (selectField) return selectField;
+        }
+      }
+    }
   }
 
   return null;
