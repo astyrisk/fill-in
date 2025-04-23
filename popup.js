@@ -23,6 +23,7 @@ function sendScrapeMessage(tabId, statusDisplay) {
 document.addEventListener('DOMContentLoaded', () => {
     const triggerButton = document.getElementById('triggerFillButton');
     const scrapeButton = document.getElementById('scrapeLinkedInJobsButton');
+    const viewJobsButton = document.getElementById('viewJobsButton');
     const statusDisplay = document.getElementById('status');
     console.log("popup.js loaded");
 
@@ -133,6 +134,26 @@ document.addEventListener('DOMContentLoaded', () => {
                         }, 3000);
                     }
                 });
+            });
+        });
+    }
+
+    if (viewJobsButton) {
+        viewJobsButton.addEventListener('click', () => {
+            console.log("viewJobsButton clicked");
+            statusDisplay.textContent = 'Opening saved jobs...';
+
+            // Open the job listings page in a new tab
+            chrome.runtime.sendMessage({
+                action: "openJobTab",
+                url: chrome.runtime.getURL("job-listings.html")
+            }, () => {
+                if (chrome.runtime.lastError) {
+                    statusDisplay.textContent = 'Error: Could not open job listings.';
+                    console.error("Error opening job listings:", chrome.runtime.lastError.message);
+                } else {
+                    statusDisplay.textContent = 'Opened job listings page.';
+                }
             });
         });
     }

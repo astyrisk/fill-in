@@ -118,6 +118,22 @@ async function scrollToBottom() {
     return { success: true, jobCardSelector };
 }
 
+// Function to get the selected country from the location input field
+function getSelectedCountry() {
+    // Try to find the location input field using the selector from country.html
+    const locationInput = document.querySelector('#jobs-search-box-location-id-ember31') ||
+                         document.querySelector('.jobs-search-box__text-input[aria-label="City, state, or zip code"]') ||
+                         document.querySelector('input[aria-label*="location"]') ||
+                         document.querySelector('input[placeholder*="location"]');
+
+    if (locationInput && locationInput.value) {
+        return locationInput.value.trim();
+    }
+
+    // Fallback to a default value if the input is not found or empty
+    return 'Unknown';
+}
+
 // Function to scrape job listings from the current page
 async function scrapeCurrentPage(jobCardSelector) {
     try {
@@ -171,6 +187,9 @@ async function scrapeCurrentPage(jobCardSelector) {
             const locationElement = card.querySelector('.job-card-container__metadata-wrapper li');
             const location = locationElement ? locationElement.textContent.trim() : 'Unknown Location';
 
+            // Use the selected country from the location input field for all jobs
+            const country = getSelectedCountry();
+
             // Get job URL - use the same titleElement from above to get the URL
             const jobUrl = titleElement && titleElement.href ? titleElement.href : '';
 
@@ -194,6 +213,7 @@ async function scrapeCurrentPage(jobCardSelector) {
                 title,
                 company,
                 location,
+                country,
                 jobUrl,
                 jobId,
                 isEasyApply,
@@ -385,9 +405,31 @@ async function clickFirstPageButton() {
     }
 }
 
+// Function to check if a job is already saved in storage
+async function checkIfJobExists(jobId, country) {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['linkedInJobsByCountry'], (data) => {
+            if (!data.linkedInJobsByCountry ||
+                !data.linkedInJobsByCountry[country] ||
+                !jobId) {
+                resolve(false);
+                return;
+            }
+
+            // Check if a job with this ID already exists in this country
+            const existingJob = data.linkedInJobsByCountry[country].find(job => job.jobId === jobId);
+            resolve(!!existingJob);
+        });
+    });
+}
+
 // Main function to scrape LinkedIn jobs
 async function scrapeLinkedInJobs() {
     console.log("Starting LinkedIn jobs scraping");
+
+    // Log the selected country at the start of scraping
+    const selectedCountry = getSelectedCountry();
+    console.log(`Using selected country: ${selectedCountry}`);
 
     // Check if we're on a LinkedIn jobs page
     if (!window.location.href.includes('linkedin.com/jobs')) {
@@ -416,10 +458,90 @@ async function scrapeLinkedInJobs() {
             return { status: "No job listings found" };
         }
 
-        // Store the scraped data in chrome.storage
+        // Get the final country value right before storing
+        const finalCountry = getSelectedCountry();
+        console.log(`Final selected country for all jobs: ${finalCountry}`);
+
+        // Make sure all jobs have the same country value
+        allJobListings.forEach(job => {
+            job.country = finalCountry;
+        });
+
+        // Get existing jobs from storage to check for duplicates
+        console.log("Checking for duplicate jobs...");
+
+        // Filter out jobs that already exist in storage
+        const newJobListings = [];
+        let duplicateCount = 0;
+
+        // Process each job to check if it's already saved
+        for (const job of allJobListings) {
+            if (!job.jobId) {
+                // If job has no ID, we can't check for duplicates, so include it
+                newJobListings.push(job);
+                continue;
+            }
+
+            // Check if this job already exists in storage
+            const jobExists = await checkIfJobExists(job.jobId, finalCountry);
+
+            if (jobExists) {
+                duplicateCount++;
+                console.log(`Skipping duplicate job: ${job.title} (ID: ${job.jobId})`);
+            } else {
+                newJobListings.push(job);
+            }
+        }
+
+        console.log(`Found ${duplicateCount} duplicate jobs. Adding ${newJobListings.length} new jobs.`);
+
+        // If no new jobs were found, return early
+        if (newJobListings.length === 0) {
+            return { status: `No new jobs found. All ${duplicateCount} jobs were already saved.` };
+        }
+
+        // Organize jobs by country (in this case, all jobs will be under the same country)
+        let jobsByCountry = {};
+
+        // Get existing jobs first
+        await new Promise(resolve => {
+            chrome.storage.local.get(['linkedInJobsByCountry'], (data) => {
+                jobsByCountry = data.linkedInJobsByCountry || {};
+                resolve();
+            });
+        });
+
+        // Add new jobs to the existing structure
+        if (finalCountry) {
+            // Initialize the country array if it doesn't exist
+            if (!jobsByCountry[finalCountry]) {
+                jobsByCountry[finalCountry] = [];
+            }
+
+            // Add new jobs to the existing array
+            jobsByCountry[finalCountry] = [...jobsByCountry[finalCountry], ...newJobListings];
+        } else {
+            // Fallback in case country is empty
+            if (!jobsByCountry['Unknown']) {
+                jobsByCountry['Unknown'] = [];
+            }
+            jobsByCountry['Unknown'] = [...jobsByCountry['Unknown'], ...newJobListings];
+        }
+
+        // Calculate total jobs for logging
+        let totalJobs = 0;
+        Object.values(jobsByCountry).forEach(countryJobs => {
+            totalJobs += countryJobs.length;
+        });
+
+        console.log(`Organized ${newJobListings.length} new jobs under country: ${finalCountry || 'Unknown'}. Total jobs: ${totalJobs}`);
+
+        // Store the updated data in chrome.storage
         chrome.storage.local.set({
-            linkedInJobs: allJobListings,
-            scrapeTimestamp: new Date().toISOString()
+            linkedInJobsByCountry: jobsByCountry,
+            linkedInJobs: Object.values(jobsByCountry).flat(), // Keep the old format for backward compatibility
+            scrapeTimestamp: new Date().toISOString(),
+            countries: Object.keys(jobsByCountry)
         }, () => {
             console.log("Job listings saved to storage");
 
@@ -443,7 +565,7 @@ async function scrapeLinkedInJobs() {
             });
         });
 
-        return { status: `Scraped ${allJobListings.length} job listings from multiple pages` };
+        return { status: `Scraped ${allJobListings.length} job listings (${newJobListings.length} new, ${duplicateCount} duplicates)` };
     } catch (error) {
         console.error("Error scraping LinkedIn jobs:", error);
         return { status: "Error scraping job listings" };
