@@ -33,6 +33,45 @@
         </div>
     </div>
 
+    <!-- Job Details Popup -->
+    <div class="popup-overlay" id="popup-overlay"></div>
+    <div class="job-details-popup" id="job-details-popup">
+        <div class="popup-header">
+            <div class="popup-title" id="popup-title">Job Title</div>
+            <button class="popup-close" id="popup-close">&times;</button>
+        </div>
+        <div class="popup-company" id="popup-company">Company Name</div>
+        <div class="popup-location" id="popup-location">Location</div>
+
+        <div class="popup-meta">
+            <div class="popup-meta-item">
+                <span class="popup-meta-label">Posted:</span>
+                <span class="popup-meta-value" id="popup-posted">Not available</span>
+            </div>
+            <div class="popup-meta-item">
+                <span class="popup-meta-label">Applications:</span>
+                <span class="popup-meta-value" id="popup-applications">Not available</span>
+            </div>
+            <div class="popup-meta-item" id="popup-apply-container" style="display: none;">
+                <a href="#" id="popup-apply-button" class="apply-button" target="_blank">Apply Now</a>
+            </div>
+        </div>
+
+        <div class="popup-section">
+            <div class="popup-section-title">Skills</div>
+            <div class="popup-skills" id="popup-skills">
+                <div class="popup-loading">Loading skills...</div>
+            </div>
+        </div>
+
+        <div class="popup-section">
+            <div class="popup-section-title">Job Description</div>
+            <div id="popup-description">
+                <div class="popup-loading">Loading job description...</div>
+            </div>
+        </div>
+    </div>
+
     <script src="job-listings.js"></script>
 </body>
 </html>

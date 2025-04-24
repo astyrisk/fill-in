@@ -9,6 +9,12 @@
     "tabs",
     "webRequest"
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["job-details-scraper.js", "job-listings.html", "job-listings.css", "job-listings.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "host_permissions": [
     "<all_urls>"
   ],
@@ -50,11 +56,5 @@
       },
       "description": "Trigger form auto-fill"
     }
-  },
-    "web_accessible_resources": [
-    {
-      "resources": ["job-listings.html", "job-listings.css", "job-listings.js"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }

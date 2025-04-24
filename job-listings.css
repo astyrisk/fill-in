@@ -124,6 +124,10 @@ button:hover {
     background-color: #6c757d;
 }
 
+.job-badge.details {
+    background-color: #5f2da0;
+}
+
 .job-company {
     font-weight: bold;
     margin-bottom: 4px;
@@ -167,4 +171,152 @@ button:hover {
 
 .apply-button:hover {
     background-color: #005582;
+}
+
+.apply-button.loading {
+    background-color: #999;
+    cursor: wait;
+    opacity: 0.8;
+}
+
+/* Job Details Popup Styles */
+.job-details-popup {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 800px;
+    max-height: 80vh;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.job-details-popup.active {
+    display: block;
+}
+
+.popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+}
+
+.popup-title {
+    font-size: 24px;
+    font-weight: bold;
+    color: #0073b1;
+}
+
+.popup-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    margin: 0;
+}
+
+.popup-company {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.popup-location {
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.popup-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+}
+
+.popup-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.popup-meta-label {
+    font-weight: bold;
+    color: #666;
+}
+
+.popup-meta-value {
+    color: #333;
+}
+
+#popup-apply-button {
+    background-color: #057642;
+    font-weight: bold;
+    padding: 8px 16px;
+    margin-top: 10px;
+}
+
+#popup-apply-button:hover {
+    background-color: #046035;
+}
+
+.popup-section {
+    margin-bottom: 20px;
+}
+
+.popup-section-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #0073b1;
+}
+
+.popup-skills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.popup-skill {
+    background-color: #eef3f8;
+    color: #0073b1;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 14px;
+}
+
+.popup-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+}
+
+.popup-overlay.active {
+    display: block;
+}
+
+.popup-loading {
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+    color: #666;
 }
