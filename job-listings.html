@@ -25,7 +25,7 @@
                     </select>
                 </div>
             </div>
-            <button id="refresh-button">Refresh Data</button>
+            <button id="delete-shown-jobs-button" class="delete-button">Delete Shown Jobs</button>
         </div>
 
         <div id="job-listings-container">
@@ -52,8 +52,9 @@
                 <span class="popup-meta-label">Applications:</span>
                 <span class="popup-meta-value" id="popup-applications">Not available</span>
             </div>
-            <div class="popup-meta-item" id="popup-apply-container" style="display: none;">
-                <a href="#" id="popup-apply-button" class="apply-button" target="_blank">Apply Now</a>
+            <div class="popup-meta-item">
+                <span class="popup-meta-label">Apply URL:</span>
+                <span class="popup-meta-value" id="popup-apply-url">Not available</span>
             </div>
         </div>
 
@@ -69,6 +70,16 @@
             <div id="popup-description">
                 <div class="popup-loading">Loading job description...</div>
             </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Dialog for Bulk Deletion -->
+    <div class="confirmation-dialog" id="confirmation-dialog">
+        <h3 id="confirmation-title">Confirm Bulk Deletion</h3>
+        <p id="confirmation-message">Are you sure you want to delete these jobs?</p>
+        <div class="confirmation-buttons">
+            <button class="confirm-button" id="confirm-delete">Delete All</button>
+            <button class="cancel-button" id="cancel-delete">Cancel</button>
         </div>
     </div>
 

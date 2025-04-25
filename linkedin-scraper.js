@@ -148,7 +148,7 @@ async function scrapeCurrentPage(jobCardSelector) {
         console.log(`Found ${jobCards.length} job listings on current page`);
 
         // Extract data from each job card
-        return Array.from(jobCards).map(card => {
+        const extractedJobs = Array.from(jobCards).map(card => {
             // Get job title - updated selector
             const titleElement = card.querySelector('.job-card-list__title--link');
             let title = titleElement ? titleElement.textContent.trim() : 'Unknown Title';
@@ -195,7 +195,18 @@ async function scrapeCurrentPage(jobCardSelector) {
 
             // Get job ID from data attribute
             const jobContainer = card.querySelector('.job-card-container');
-            const jobId = jobContainer ? jobContainer.getAttribute('data-job-id') : '';
+            let jobId = jobContainer ? jobContainer.getAttribute('data-job-id') : '';
+
+            // Generate a unique ID if none is found
+            if (!jobId) {
+                // Create a hash from the job title, company and URL if available
+                const hashSource = `${title}-${company}-${jobUrl}-${Date.now()}-${Math.random()}`;
+                jobId = 'generated-' + hashSource.split('').reduce((a, b) => {
+                    a = ((a << 5) - a) + b.charCodeAt(0);
+                    return a & a;
+                }, 0).toString(36);
+                console.log(`Generated ID for job without ID: ${jobId}`);
+            }
 
             // Check if job has Easy Apply
             const easyApplyElement = card.querySelector('.job-card-container__footer-item:not(.job-card-container__footer-job-state)');
@@ -221,6 +232,22 @@ async function scrapeCurrentPage(jobCardSelector) {
                 applicationInsight
             };
         });
+
+        // Filter out jobs with missing essential data
+        const validJobs = extractedJobs.filter(job => {
+            const hasEssentialData = job.title && job.title !== 'Unknown Title' &&
+                                     job.company && job.company !== 'Unknown Company' &&
+                                     job.jobId;
+
+            if (!hasEssentialData) {
+                console.warn('Filtering out job with missing essential data:', job);
+            }
+
+            return hasEssentialData;
+        });
+
+        console.log(`Filtered out ${extractedJobs.length - validJobs.length} jobs with missing essential data`);
+        return validJobs;
     } catch (error) {
         console.error("Error scraping current page:", error);
         return [];
@@ -409,16 +436,31 @@ async function clickFirstPageButton() {
 async function checkIfJobExists(jobId, country) {
     return new Promise((resolve) => {
         chrome.storage.local.get(['linkedInJobsByCountry'], (data) => {
-            if (!data.linkedInJobsByCountry ||
-                !data.linkedInJobsByCountry[country] ||
-                !jobId) {
+            if (!jobId) {
                 resolve(false);
                 return;
             }
 
             // Check if a job with this ID already exists in this country
-            const existingJob = data.linkedInJobsByCountry[country].find(job => job.jobId === jobId);
-            resolve(!!existingJob);
+            if (data.linkedInJobsByCountry && data.linkedInJobsByCountry[country]) {
+                const existingJob = data.linkedInJobsByCountry[country].find(job => job.jobId === jobId);
+                if (existingJob) {
+                    resolve(true);
+                    return;
+                }
+            }
+
+            // Also check if the job exists in the Archive country
+            if (data.linkedInJobsByCountry && data.linkedInJobsByCountry['Archive']) {
+                const archivedJob = data.linkedInJobsByCountry['Archive'].find(job => job.jobId === jobId);
+                if (archivedJob) {
+                    console.log(`Job ${jobId} was previously archived and won't be added again`);
+                    resolve(true);
+                    return;
+                }
+            }
+
+            resolve(false);
         });
     });
 }

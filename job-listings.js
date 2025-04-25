@@ -2,13 +2,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const jobListingsContainer = document.getElementById('job-listings-container');
     const scrapeInfo = document.getElementById('scrape-info');
     const searchInput = document.getElementById('search-input');
-    const refreshButton = document.getElementById('refresh-button');
+    // Refresh button removed
+    const deleteShownJobsButton = document.getElementById('delete-shown-jobs-button');
     const countrySelect = document.getElementById('country-select');
 
     // Popup elements
     const popupOverlay = document.getElementById('popup-overlay');
     const jobDetailsPopup = document.getElementById('job-details-popup');
     const popupClose = document.getElementById('popup-close');
+
+    // Confirmation dialog elements
+    const confirmationDialog = document.getElementById('confirmation-dialog');
+    const confirmationTitle = document.getElementById('confirmation-title');
+    const confirmationMessage = document.getElementById('confirmation-message');
+    const confirmDeleteButton = document.getElementById('confirm-delete');
+    const cancelDeleteButton = document.getElementById('cancel-delete');
+
+    // Variables to store deletion context
+    let deletionContext = {
+        filteredJobs: null
+    };
 
     // Close popup when clicking the close button or overlay
     popupClose.addEventListener('click', closePopup);
@@ -34,14 +47,83 @@ document.addEventListener('DOMContentLoaded', () => {
         populateCountryDropdown();
     }
 
-    refreshButton.addEventListener('click', () => {
-        // Send message to background script to go back to LinkedIn and scrape again
-        chrome.runtime.sendMessage({
-            action: "openJobTab",
-            url: "https://www.linkedin.com/jobs/"
+    // Refresh button event listener removed
+
+    // Function to get filtered jobs based on current filters
+    function getFilteredJobs(callback) {
+        chrome.storage.local.get(['linkedInJobs', 'linkedInJobsByCountry'], (data) => {
+            const searchTerm = searchInput.value.toLowerCase();
+            const selectedCountry = countrySelect.value;
+            let allJobs = [];
+
+            if (data.linkedInJobsByCountry && Object.keys(data.linkedInJobsByCountry).length > 0) {
+                // If country is selected and not 'all', filter by country
+                if (selectedCountry && selectedCountry !== 'all') {
+                    allJobs = data.linkedInJobsByCountry[selectedCountry] || [];
+                } else {
+                    // If 'all' is selected, combine all countries
+                    Object.values(data.linkedInJobsByCountry).forEach(countryJobs => {
+                        allJobs = allJobs.concat(countryJobs);
+                    });
+                }
+            } else if (data.linkedInJobs) {
+                // Fall back to old format
+                allJobs = data.linkedInJobs;
+            } else {
+                // No jobs available
+                callback([]);
+                return;
+            }
+
+            // Apply text search filter
+            const filteredJobs = allJobs.filter(job => {
+                return job.title.toLowerCase().includes(searchTerm) ||
+                       job.company.toLowerCase().includes(searchTerm) ||
+                       job.location.toLowerCase().includes(searchTerm) ||
+                       (job.applicationInsight && job.applicationInsight.toLowerCase().includes(searchTerm)) ||
+                       (job.jobId && job.jobId.toLowerCase().includes(searchTerm));
+            });
+
+            // Apply Easy Apply filter
+            const easyApplyJobs = document.getElementById('filter-easy-apply')?.checked ?
+                filteredJobs.filter(job => job.isEasyApply) : filteredJobs;
+
+            callback(easyApplyJobs);
         });
-        window.close();
+    }
+
+    // Add event listener for Delete Shown Jobs button
+    deleteShownJobsButton.addEventListener('click', () => {
+        // Get the currently filtered jobs
+        getFilteredJobs((filteredJobs) => {
+            if (filteredJobs.length === 0) {
+                alert('No jobs to delete with current filters.');
+                return;
+            }
+
+            // Set up deletion context
+            deletionContext = {
+                filteredJobs: filteredJobs
+            };
+
+            // Show confirmation dialog
+            confirmationTitle.textContent = 'Delete Multiple Jobs';
+            confirmationMessage.textContent = `Are you sure you want to delete ${filteredJobs.length} jobs? This action cannot be undone.`;
+            confirmationDialog.classList.add('active');
+            popupOverlay.classList.add('active');
+        });
     });
+
+    // Add event listeners for confirmation dialog buttons
+    confirmDeleteButton.addEventListener('click', () => {
+        // Delete multiple jobs
+        deleteMultipleJobs(deletionContext.filteredJobs);
+
+        // Close the confirmation dialog
+        closeConfirmationDialog();
+    });
+
+    cancelDeleteButton.addEventListener('click', closeConfirmationDialog);
 
     // Function to populate the country dropdown
     function populateCountryDropdown() {
@@ -119,6 +201,221 @@ document.addEventListener('DOMContentLoaded', () => {
         jobDetailsPopup.classList.remove('active');
     }
 
+    // Function to close the confirmation dialog
+    function closeConfirmationDialog() {
+        confirmationDialog.classList.remove('active');
+        popupOverlay.classList.remove('active');
+    }
+
+    // Function to archive a single job (move to Archive country)
+    function archiveSingleJob(jobId, country, jobElement) {
+        // Don't archive if the job is already in Archive
+        if (country === 'Archive') {
+            alert('This job is already archived');
+            return;
+        }
+
+        chrome.storage.local.get(['linkedInJobsByCountry'], (data) => {
+            if (!data.linkedInJobsByCountry) return;
+
+            // Find the job in the country's job list
+            const countryJobs = data.linkedInJobsByCountry[country];
+            if (!countryJobs) return;
+
+            // Find the job to archive
+            const jobToArchive = countryJobs.find(job => job.jobId === jobId);
+            if (!jobToArchive) return;
+
+            // Create a copy of the job with updated country
+            const archivedJob = {
+                ...jobToArchive,
+                country: 'Archive',
+                archivedAt: new Date().toISOString(),
+                originalCountry: country
+            };
+
+            // Initialize Archive country if it doesn't exist
+            if (!data.linkedInJobsByCountry['Archive']) {
+                data.linkedInJobsByCountry['Archive'] = [];
+            }
+
+            // Add the job to the Archive country
+            data.linkedInJobsByCountry['Archive'].push(archivedJob);
+
+            // Filter out the job from the original country
+            const updatedCountryJobs = countryJobs.filter(job => job.jobId !== jobId);
+
+            // Update the country's job list
+            data.linkedInJobsByCountry[country] = updatedCountryJobs;
+
+            // Update the flat list for backward compatibility
+            const updatedAllJobs = Object.values(data.linkedInJobsByCountry).flat();
+
+            // Save the updated data
+            chrome.storage.local.set({
+                linkedInJobsByCountry: data.linkedInJobsByCountry,
+                linkedInJobs: updatedAllJobs,
+                countries: Object.keys(data.linkedInJobsByCountry)
+            }, () => {
+                console.log(`Archived job ${jobId} from ${country} to Archive`);
+
+                // Remove the job element from the DOM if provided
+                if (jobElement && jobElement.parentNode) {
+                    jobElement.parentNode.removeChild(jobElement);
+                }
+
+                // Update the job count in the UI
+                updateJobCountDisplay(updatedAllJobs.length);
+            });
+        });
+    }
+
+    // Function to delete a single job
+    function deleteSingleJob(jobId, country, jobElement) {
+        // If we have a job element but no ID or country, just remove the element from the DOM
+        if (jobElement && (!jobId || !country)) {
+            console.log('Removing job element without ID or country from the DOM');
+            if (jobElement.parentNode) {
+                jobElement.parentNode.removeChild(jobElement);
+            }
+            return;
+        }
+
+        chrome.storage.local.get(['linkedInJobsByCountry'], (data) => {
+            if (!data.linkedInJobsByCountry) {
+                // If there's no job data but we have a job element, remove it
+                if (jobElement && jobElement.parentNode) {
+                    jobElement.parentNode.removeChild(jobElement);
+                }
+                return;
+            }
+
+            // If country is missing, try to find the job in all countries
+            if (!country) {
+                let foundJob = false;
+                Object.keys(data.linkedInJobsByCountry).forEach(countryKey => {
+                    const countryJobs = data.linkedInJobsByCountry[countryKey];
+                    const jobToDelete = countryJobs.find(job => job.jobId === jobId);
+                    if (jobToDelete) {
+                        foundJob = true;
+                        // Use the found country to delete the job
+                        country = countryKey;
+                    }
+                });
+
+                if (!foundJob) {
+                    // If job not found and we have a job element, remove it
+                    if (jobElement && jobElement.parentNode) {
+                        jobElement.parentNode.removeChild(jobElement);
+                    }
+                    return;
+                }
+            }
+
+            // Find the job in the country's job list
+            const countryJobs = data.linkedInJobsByCountry[country];
+            if (!countryJobs) {
+                // If country doesn't exist but we have a job element, remove it
+                if (jobElement && jobElement.parentNode) {
+                    jobElement.parentNode.removeChild(jobElement);
+                }
+                return;
+            }
+
+            // Filter out the job to delete
+            const updatedCountryJobs = countryJobs.filter(job => job.jobId !== jobId);
+
+            // Update the country's job list
+            data.linkedInJobsByCountry[country] = updatedCountryJobs;
+
+            // If the country has no more jobs, remove it (except for Archive)
+            if (updatedCountryJobs.length === 0 && country !== 'Archive') {
+                delete data.linkedInJobsByCountry[country];
+            }
+
+            // Update the flat list for backward compatibility
+            const updatedAllJobs = Object.values(data.linkedInJobsByCountry).flat();
+
+            // Save the updated data
+            chrome.storage.local.set({
+                linkedInJobsByCountry: data.linkedInJobsByCountry,
+                linkedInJobs: updatedAllJobs,
+                countries: Object.keys(data.linkedInJobsByCountry)
+            }, () => {
+                console.log(`Permanently deleted job ${jobId} from ${country}`);
+
+                // Remove the job element from the DOM if provided
+                if (jobElement && jobElement.parentNode) {
+                    jobElement.parentNode.removeChild(jobElement);
+                }
+
+                // Update the job count in the UI
+                updateJobCountDisplay(updatedAllJobs.length);
+            });
+        });
+    }
+
+    // Function to delete multiple jobs
+    function deleteMultipleJobs(jobsToDelete) {
+        chrome.storage.local.get(['linkedInJobsByCountry'], (data) => {
+            if (!data.linkedInJobsByCountry) return;
+
+            // Create a set of job IDs to delete for faster lookup
+            const jobIdsToDelete = new Set(jobsToDelete.map(job => job.jobId));
+
+            // Create a new object to store the updated jobs by country
+            const updatedJobsByCountry = {};
+
+            // For each country, process the jobs to delete
+            Object.keys(data.linkedInJobsByCountry).forEach(country => {
+                const countryJobs = data.linkedInJobsByCountry[country];
+
+                // Filter out the jobs to delete
+                const updatedCountryJobs = countryJobs.filter(job => !jobIdsToDelete.has(job.jobId));
+
+                // Only add the country if it still has jobs or if it's the Archive country
+                if (updatedCountryJobs.length > 0 || country === 'Archive') {
+                    updatedJobsByCountry[country] = updatedCountryJobs;
+                }
+            });
+
+            // Update the flat list for backward compatibility
+            const updatedAllJobs = Object.values(updatedJobsByCountry).flat();
+
+            // Save the updated data
+            chrome.storage.local.set({
+                linkedInJobsByCountry: updatedJobsByCountry,
+                linkedInJobs: updatedAllJobs,
+                countries: Object.keys(updatedJobsByCountry)
+            }, () => {
+                console.log(`Permanently deleted ${jobsToDelete.length} jobs`);
+
+                // Refresh the job listings display
+                renderJobListings(updatedAllJobs);
+
+                // Update the job count in the UI
+                updateJobCountDisplay(updatedAllJobs.length);
+            });
+        });
+    }
+
+    // Function to update the job count display
+    function updateJobCountDisplay(totalJobCount) {
+        const searchTerm = searchInput.value.toLowerCase();
+        const selectedCountry = countrySelect.value;
+
+        let statusText = `${totalJobCount} jobs`;
+        if (selectedCountry && selectedCountry !== 'all') {
+            statusText += ` in ${selectedCountry}`;
+        }
+
+        if (searchTerm) {
+            statusText += ` (filtered by "${searchTerm}")`;
+        }
+
+        scrapeInfo.textContent = statusText;
+    }
+
     // Function to open the popup and display job details
     function openJobDetailsPopup(job) {
         console.log('Opening job details popup for:', job);
@@ -129,27 +426,47 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('popup-location').textContent = job.location || 'Location';
 
         // Set posting date if available
-        if (job.postingDate && typeof job.postingDate === 'object') {
-            // If it's the new format with converted date
-            document.getElementById('popup-posted').textContent =
-                `${job.postingDate.originalText} (${job.postingDate.convertedDate})`;
+        if (job.convertedDate && job.convertedDate.formattedDate) {
+            let dateText = job.convertedDate.formattedDate;
+            // Add the action (Posted/Reposted) if available
+            if (job.convertedDate.action) {
+                dateText += ` (${job.convertedDate.action})`;
+            }
+            document.getElementById('popup-posted').textContent = dateText;
         } else {
-            // Fallback to the old format or not available
             document.getElementById('popup-posted').textContent = job.postingDate || 'Not available';
         }
 
         // Set application count if available
         document.getElementById('popup-applications').textContent = job.applicantCount || 'Not available';
 
-        // Set up Apply button if we have the URL
-        const applyContainer = document.getElementById('popup-apply-container');
-        const applyButton = document.getElementById('popup-apply-button');
-
-        if (job.applyUrl) {
-            applyButton.href = job.applyUrl;
-            applyContainer.style.display = 'block';
+        // Set application URL if available
+        const applyUrlElement = document.getElementById('popup-apply-url');
+        if (job.applicationUrl) {
+            // Create a clickable link
+            applyUrlElement.innerHTML = `<a href="${job.applicationUrl}" target="_blank" rel="noopener noreferrer">Open Application Page</a>`;
         } else {
-            applyContainer.style.display = 'none';
+            // Check if we have a captured URL for this job in storage
+            if (job.jobId) {
+                chrome.storage.local.get(['capturedApplicationUrls'], (data) => {
+                    const capturedUrls = data.capturedApplicationUrls || {};
+                    if (capturedUrls[job.jobId]) {
+                        console.log('Found captured URL in storage for job', job.jobId);
+                        // Create a clickable link
+                        applyUrlElement.innerHTML = `<a href="${capturedUrls[job.jobId]}" target="_blank" rel="noopener noreferrer">Open Application Page</a>`;
+
+                        // Update the job object with the URL
+                        job.applicationUrl = capturedUrls[job.jobId];
+
+                        // Update the job in storage
+                        updateJobWithDetails(job.jobId, job.country, { applicationUrl: capturedUrls[job.jobId] });
+                    } else {
+                        applyUrlElement.textContent = 'Not available - Click Apply button to capture';
+                    }
+                });
+            } else {
+                applyUrlElement.textContent = 'Not available - Click Apply button to capture';
+            }
         }
 
         // Set skills if available
@@ -209,24 +526,45 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
 
                         // Update other fields
-                        if (job.postingDate && typeof job.postingDate === 'object') {
-                            document.getElementById('popup-posted').textContent =
-                                `${job.postingDate.originalText} (${job.postingDate.convertedDate})`;
+                        if (job.convertedDate && job.convertedDate.formattedDate) {
+                            let dateText = job.convertedDate.formattedDate;
+                            // Add the action (Posted/Reposted) if available
+                            if (job.convertedDate.action) {
+                                dateText += ` (${job.convertedDate.action})`;
+                            }
+                            document.getElementById('popup-posted').textContent = dateText;
                         } else {
                             document.getElementById('popup-posted').textContent = job.postingDate || 'Not available';
                         }
-
                         document.getElementById('popup-applications').textContent = job.applicantCount || 'Not available';
 
-                        // Update Apply button
-                        const applyContainer = document.getElementById('popup-apply-container');
-                        const applyButton = document.getElementById('popup-apply-button');
-
-                        if (job.applyUrl) {
-                            applyButton.href = job.applyUrl;
-                            applyContainer.style.display = 'block';
+                        // Update application URL if available
+                        const applyUrlElement = document.getElementById('popup-apply-url');
+                        if (job.applicationUrl) {
+                            // Create a clickable link
+                            applyUrlElement.innerHTML = `<a href="${job.applicationUrl}" target="_blank" rel="noopener noreferrer">Open Application Page</a>`;
                         } else {
-                            applyContainer.style.display = 'none';
+                            // Check if we have a captured URL for this job in storage
+                            if (job.jobId) {
+                                chrome.storage.local.get(['capturedApplicationUrls'], (data) => {
+                                    const capturedUrls = data.capturedApplicationUrls || {};
+                                    if (capturedUrls[job.jobId]) {
+                                        console.log('Found captured URL in storage for job', job.jobId);
+                                        // Create a clickable link
+                                        applyUrlElement.innerHTML = `<a href="${capturedUrls[job.jobId]}" target="_blank" rel="noopener noreferrer">Open Application Page</a>`;
+
+                                        // Update the job object with the URL
+                                        job.applicationUrl = capturedUrls[job.jobId];
+
+                                        // Update the job in storage
+                                        updateJobWithDetails(job.jobId, job.country, { applicationUrl: capturedUrls[job.jobId] });
+                                    } else {
+                                        applyUrlElement.textContent = 'Not available - Click Apply button to capture';
+                                    }
+                                });
+                            } else {
+                                applyUrlElement.textContent = 'Not available - Click Apply button to capture';
+                            }
                         }
                     } else {
                         descriptionContainer.innerHTML = '<div>Failed to load job description</div>';
@@ -349,6 +687,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 badges.push('<span class="job-badge details">Details Available</span>');
             }
 
+            // Format posting date if available
+            let postingDateHtml = '';
+            if (job.convertedDate && job.convertedDate.formattedDate) {
+                postingDateHtml = `<div class="job-posting-date">Posted: ${job.convertedDate.formattedDate}</div>`;
+            } else if (job.postingDate) {
+                postingDateHtml = `<div class="job-posting-date">Posted: ${job.postingDate}</div>`;
+            }
+
             jobCard.innerHTML = `
                 <div class="job-header">
                     <div class="job-title">${job.title}</div>
@@ -356,10 +702,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="job-company">${job.company}</div>
                 <div class="job-location">${job.location}</div>
+                ${postingDateHtml}
                 ${insightHtml}
                 <div class="job-actions">
                     <a href="javascript:void(0)" class="apply-button view-job-btn" data-job-id="${job.jobId || ''}" data-job-url="${job.jobUrl}" data-job-country="${job.country || ''}">View Job</a>
                     <a href="${job.jobUrl}" target="_blank" class="apply-button" style="margin-left: 5px;">Open in LinkedIn</a>
+                    <button class="job-archive-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}">Archive</button>
+                    <button class="job-delete-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}">Delete</button>
                     <span class="job-id">ID: ${job.jobId || 'N/A'}</span>
                 </div>
             `;
@@ -429,6 +778,38 @@ document.addEventListener('DOMContentLoaded', () => {
             viewJobBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 openJobDetailsPopup(job);
+            });
+
+            // Get the archive button we just added
+            const archiveJobBtn = jobCard.querySelector('.job-archive-button');
+
+            // Add click event to archive the job
+            archiveJobBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const jobId = this.getAttribute('data-job-id');
+                const country = this.getAttribute('data-job-country');
+
+                if (!jobId || !country) {
+                    alert('Cannot archive job: Need both job ID and country to archive');
+                    return;
+                }
+
+                // Archive the job immediately without confirmation
+                archiveSingleJob(jobId, country, jobCard);
+            });
+
+            // Get the delete button we just added
+            const deleteJobBtn = jobCard.querySelector('.job-delete-button');
+
+            // Add click event to delete the job
+            deleteJobBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const jobId = this.getAttribute('data-job-id');
+                const country = this.getAttribute('data-job-country');
+
+                // Delete the job immediately without confirmation
+                // Even if jobId or country is missing, we'll handle it in deleteSingleJob
+                deleteSingleJob(jobId, country, jobCard);
             });
         });
     }

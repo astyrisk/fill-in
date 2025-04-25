@@ -78,6 +78,109 @@ button:hover {
     background-color: #005582;
 }
 
+.archive-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: auto;
+}
+
+.archive-button:hover {
+    background-color: #2980b9;
+}
+
+.delete-button {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+.delete-button:hover {
+    background-color: #c0392b;
+}
+
+.job-archive-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+    margin-left: 5px;
+}
+
+.job-archive-button:hover {
+    background-color: #2980b9;
+}
+
+.job-delete-button {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+    margin-left: 5px;
+}
+
+.job-delete-button:hover {
+    background-color: #c0392b;
+}
+
+/* Confirmation Dialog */
+.confirmation-dialog {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    z-index: 1001;
+    text-align: center;
+    width: 300px;
+}
+
+.confirmation-dialog.active {
+    display: block;
+}
+
+.confirmation-dialog h3 {
+    margin-top: 0;
+    color: #e74c3c;
+}
+
+.confirmation-dialog p {
+    margin-bottom: 20px;
+}
+
+.confirmation-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.confirm-button {
+    background-color: #e74c3c;
+}
+
+.cancel-button {
+    background-color: #7f8c8d;
+}
+
 .job-card {
     background-color: white;
     border-radius: 8px;
@@ -135,7 +238,14 @@ button:hover {
 
 .job-location {
     color: #666;
+    margin-bottom: 4px;
+}
+
+.job-posting-date {
+    color: #666;
+    font-size: 13px;
     margin-bottom: 8px;
+    font-style: italic;
 }
 
 .job-insight {
@@ -156,6 +266,7 @@ button:hover {
 .job-actions {
     display: flex;
     gap: 10px;
+    align-items: center;
 }
 
 .apply-button {
@@ -260,17 +371,6 @@ button:hover {
 
 .popup-meta-value {
     color: #333;
-}
-
-#popup-apply-button {
-    background-color: #057642;
-    font-weight: bold;
-    padding: 8px 16px;
-    margin-top: 10px;
-}
-
-#popup-apply-button:hover {
-    background-color: #046035;
 }
 
 .popup-section {

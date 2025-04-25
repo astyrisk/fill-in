@@ -1,6 +1,6 @@
 /**
  * Fill-In Extension - Utility Functions
- * 
+ *
  * Core utility functions for DOM manipulation and event handling.
  */
 
@@ -41,6 +41,83 @@ function showNotification(message) {
       notification.parentNode.removeChild(notification);
     }
   }, 3000);
+}
+
+/**
+ * Converts LinkedIn relative time string to an actual date
+ * @param {string} relativeTimeString - LinkedIn relative time string (e.g., "Posted 4 days ago", "Reposted 7 hours ago", "22 hours ago")
+ * @returns {Object} - Object containing date information
+ */
+function convertRelativeTimeToDate(relativeTimeString) {
+  if (!relativeTimeString) return null;
+
+  // First try to match the standard format with "Posted" or "Reposted"
+  let timeMatch = relativeTimeString.match(/(Posted|Reposted)\s+(\d+)\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months)\s+ago/);
+  let action = null;
+  let amount = null;
+  let unit = null;
+
+  if (timeMatch) {
+    // Standard format with action prefix
+    [, action, amount, unit] = timeMatch;
+  } else {
+    // Try to match the format without "Posted" or "Reposted" prefix (e.g., "22 hours ago")
+    timeMatch = relativeTimeString.match(/(\d+)\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months)\s+ago/);
+
+    if (timeMatch) {
+      // Format without action prefix
+      [, amount, unit] = timeMatch;
+      action = 'Posted'; // Default to "Posted" when no action is specified
+    } else {
+      // If we can't parse the string, return the original string
+      console.log('Could not parse relative time string:', relativeTimeString);
+      return relativeTimeString;
+    }
+  }
+
+  const numAmount = parseInt(amount, 10);
+
+  // Create a new date object for the current time
+  const date = new Date();
+
+  // Subtract the appropriate amount of time based on the unit
+  switch (unit) {
+    case 'minute':
+    case 'minutes':
+      date.setMinutes(date.getMinutes() - numAmount);
+      break;
+    case 'hour':
+    case 'hours':
+      date.setHours(date.getHours() - numAmount);
+      break;
+    case 'day':
+    case 'days':
+      date.setDate(date.getDate() - numAmount);
+      break;
+    case 'week':
+    case 'weeks':
+      date.setDate(date.getDate() - (numAmount * 7));
+      break;
+    case 'month':
+    case 'months':
+      date.setMonth(date.getMonth() - numAmount);
+      break;
+    default:
+      console.log('Unknown time unit:', unit);
+      return relativeTimeString;
+  }
+
+  // Return the date in ISO format
+  return {
+    originalText: relativeTimeString,
+    action: action, // 'Posted', 'Reposted', or null if not specified
+    isoDate: date.toISOString(),
+    formattedDate: date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  };
 }
 
 /**
