@@ -14,10 +14,13 @@ chromium-based (Manifest V3) extension to filter related jobs from linked-in and
                 console.error("Popup Error:", chrome.runtime.lastError.message);
 
 
+## TODO
+- [ ] fix apply url 
+- [ ] implement applied category for jobs
+
 ## works on the following
 - https://jobs.lever.co/instructure/8218b205-0c5c-4cc7-99a6-6ba4befec9ab/apply?source=LinkedIn
 - https://careers.zenitech.co.uk/jobs/5454808-java-software-engineer/applications/new
-
 
 
 ## It breaks on the following
