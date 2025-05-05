@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Try to inject the content script if it's not already there
                 chrome.scripting.executeScript({
                     target: { tabId: activeTab.id },
-                    files: ['content.js']
+                    files: ['form-filler/content.js']
                 }).then(() => {
                     // Now try to send the message
                     chrome.tabs.sendMessage(
@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Script not loaded, inject it
                         chrome.scripting.executeScript({
                             target: { tabId: activeTab.id },
-                            files: ['linkedin-scraper.js']
+                            files: ['job-scraper/linkedin-scraper.js']
                         }).then(() => {
                             sendScrapeMessage(activeTab.id, statusDisplay);
                             // Re-enable the button after a delay to allow scraping to complete
@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Open the job listings page in a new tab
             chrome.runtime.sendMessage({
                 action: "openJobTab",
-                url: chrome.runtime.getURL("job-listings.html")
+                url: chrome.runtime.getURL("job-scraper/job-listings.html")
             }, () => {
                 if (chrome.runtime.lastError) {
                     statusDisplay.textContent = 'Error: Could not open job listings.';

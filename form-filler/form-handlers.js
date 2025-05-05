@@ -1,6 +1,6 @@
 /**
  * Fill-In Extension - Form Handlers
- * 
+ *
  * Specialized handlers for different types of forms.
  */
 
@@ -76,9 +76,9 @@ function handleAngularForms() {
  */
 function handleCitizenshipFields(userData) {
   if (!userData.workAuth) return false;
-  
+
   let citizenshipFilled = false;
-  
+
   // First, try a direct approach for the specific radio button
   const nonEURadio = document.querySelector('input[type="radio"][value="I am a non-EU citizen and currently require a work permit to work in Hungary"]');
   if (nonEURadio && (userData.workAuth.includes('non-EU citizen') || userData.workAuth === 'I am a non-EU citizen and currently require a work permit to work in Hungary')) {
@@ -182,7 +182,7 @@ function handleCitizenshipFields(userData) {
                         fillInputByLabel('work authorization', userData.workAuth);
     }
   }
-  
+
   return citizenshipFilled;
 }
 
@@ -193,9 +193,9 @@ function handleCitizenshipFields(userData) {
  */
 function handleEnglishFluencyFields(userData) {
   if (!userData.englishFluency) return false;
-  
+
   let englishFluencyFilled = false;
-  
+
   // First try to find the specific English fluency container
   const englishFluencyContainer = Array.from(document.querySelectorAll('.application-label'));
   let englishFluencyUl = null;
@@ -223,6 +223,6 @@ function handleEnglishFluencyFields(userData) {
       fillInputByLabel('English fluency', userData.englishFluency) ||
       fillInputByLabel('fluency in English', userData.englishFluency);
   }
-  
+
   return englishFluencyFilled;
 }

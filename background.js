@@ -58,12 +58,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // First inject the utils.js file which contains the date conversion function
         chrome.scripting.executeScript({
           target: { tabId },
-          files: ['utils.js']
+          files: ['shared/utils.js']
         }).then(() => {
           // Then inject the job details scraper script
           return chrome.scripting.executeScript({
             target: { tabId },
-            files: ['job-details-scraper.js']
+            files: ['job-scraper/job-details-scraper.js']
           });
         }).then(() => {
           // Send message to the content script to scrape job details
@@ -110,12 +110,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle URL capture start request
   if (request.action === "startUrlCapture") {
     console.log("Starting URL capture");
-    
+
     // Clear any existing timeout
     if (captureTimeoutId) {
       clearTimeout(captureTimeoutId);
     }
-    
+
     isCapturingUrl = true;
     pendingCapture = true;
 
@@ -136,20 +136,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log("URL capture timeout - resetting capture state");
         isCapturingUrl = false;
         pendingCapture = false;
-        
+
         // If we have a job ID but no URL was captured, store a fallback URL
         if (currentJobId) {
           const fallbackUrl = `https://www.linkedin.com/jobs/view/${currentJobId}/apply/`;
           console.log(`Using fallback application URL for job ${currentJobId}:`, fallbackUrl);
-          
+
           // Store the fallback URL
           chrome.storage.local.get(['capturedApplicationUrls'], (data) => {
             const capturedUrls = data.capturedApplicationUrls || {};
-            
+
             // Only store if we don't already have a URL for this job
             if (!capturedUrls[currentJobId]) {
               capturedUrls[currentJobId] = fallbackUrl;
-              
+
               chrome.storage.local.set({ capturedApplicationUrls: capturedUrls }, () => {
                 console.log(`Stored fallback application URL for job ${currentJobId} in local storage`);
               });
@@ -212,7 +212,7 @@ chrome.webNavigation.onBeforeNavigate.addListener((details) => {
       // Reset the capturing flags
       isCapturingUrl = false;
       pendingCapture = false;
-      
+
       // Clear the timeout
       if (captureTimeoutId) {
         clearTimeout(captureTimeoutId);
@@ -291,7 +291,7 @@ chrome.tabs.onCreated.addListener((tab) => {
           // Reset the capturing flags
           isCapturingUrl = false;
           pendingCapture = false;
-          
+
           // Clear the timeout
           if (captureTimeoutId) {
             clearTimeout(captureTimeoutId);
@@ -384,7 +384,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       // Reset the capturing flags
       isCapturingUrl = false;
       pendingCapture = false;
-      
+
       // Clear the timeout
       if (captureTimeoutId) {
         clearTimeout(captureTimeoutId);

@@ -595,7 +595,7 @@ async function scrapeLinkedInJobs() {
                         // Open the results page
                         chrome.runtime.sendMessage({
                             action: "openJobTab",
-                            url: chrome.runtime.getURL("job-listings.html")
+                            url: chrome.runtime.getURL("job-scraper/job-listings.html")
                         });
 
                         // Reset the flag after a short delay
@@ -631,4 +631,3 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     }
     return true; // Keep the message channel open for async response
 });
-

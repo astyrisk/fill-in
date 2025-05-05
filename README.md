@@ -48,3 +48,41 @@ chromium-based (Manifest V3) extension to filter related jobs from linked-in and
     - Indeed - Not implemented yet
     - LinkedIn Apply Forms - Not implemented yet
     - Glassdoor Apply Forms - Not implemented yet
+
+
+
+
+
+<button role="link" aria-label="Apply to Test Automation Engineer  on company website" id="jobs-apply-button-id" class="jobs-apply-button artdeco-button artdeco-button--icon-right artdeco-button--3 artdeco-button--primary ember-view" data-live-test-job-apply-button="">        
+         
+<svg role="none" aria-hidden="true" class="artdeco-button__icon " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" data-supported-dps="16x16" data-test-icon="link-external-small"> <use href="#link-external-small" width="16" height="16"></use> </svg>
+
+<span class="artdeco-button__text">
+    Apply
+</span>
+
+</button>
+
+
+
+onClickUpdate
+
+
+
+// file name = > 3i3xwuuxlymaqdmv1p4clzey9
+onApplyClick() {
+    var e, t
+    const {companyApplyUrl: n, onsiteApply: i} = (null === (e = this.args.jobApplyCard.jobPostingCard.primaryActionV2) || void 0 === e || null === (t = e.applyJobAction) || void 0 === t ? void 0 : t.applyJobActionResolutionResult) ?? {}
+    if (i) {
+        const e = (0,
+        h.addQueryParams)(`${(0,
+        h.getDomainUrl)()}/jobs/view/${this.jobId}/apply`, {
+            trackingId: this.args.trackingId,
+            refId: this.args.jobApplyCard.jobTrackingData.referenceId
+        })
+        this.windowService.open(e)
+    } else
+        n && this.windowService.open(n)
+    this.fireApplyClickEvent()
+    this.fireCoachActionEvent()
+}
