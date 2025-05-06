@@ -4,306 +4,22 @@
 // Variable to store the application URL captured from navigation events
 let capturedApplicationUrl = null;
 
-// Set up a listener to capture navigation events
+// Set up a function to click the apply button and open in a new tab
 function setupNavigationCapture() {
-    console.log('Setting up navigation capture for application URL');
+    console.log('Setting up apply button click for external application');
 
     // Find the apply button - try multiple selectors to ensure we find it
     const applyButton = document.querySelector('#jobs-apply-button-id, .jobs-apply-button, button[role="link"][aria-label*="Apply"], a[data-control-name="jobdetails_apply_button"]');
 
     if (applyButton) {
-        console.log('Found apply button, setting up click listener');
+        console.log('Found apply button, clicking to open in new tab');
 
-        // Store the job ID from the URL if available
-        const jobId = extractJobIdFromUrl(window.location.href);
-        console.log('Current job ID:', jobId);
-
-        // Add a click listener to capture the URL before navigation
-        applyButton.addEventListener('click', function(event) {
-            // Don't prevent default for now, as it might interfere with LinkedIn's own handlers
-            // event.preventDefault();
-            // event.stopPropagation();
-
-            console.log('Apply button clicked, capturing URL');
-
-            // Send a message to the background script to start URL capture with the job ID
-            chrome.runtime.sendMessage({
-                action: "startUrlCapture",
-                jobId: jobId,
-                sourceUrl: window.location.href
-            });
-
-            // We'll let the click proceed normally and rely on the background script
-            // to capture the URL of any new tab that opens
-        });
-
-        // Extract URL from onclick handlers
-        const onclickAttr = applyButton.getAttribute('onclick');
-        if (onclickAttr) {
-            console.log('Found onclick attribute:', onclickAttr);
-            // Try to extract URL from onclick if possible - improved regex to handle more patterns
-            const urlMatch = onclickAttr.match(/window\.open\(['"]([^'"]+)['"]/) ||
-                            onclickAttr.match(/location\.href\s*=\s*['"]([^'"]+)['"]/) ||
-                            onclickAttr.match(/location\.replace\(['"]([^'"]+)['"]/);
-            if (urlMatch && urlMatch[1]) {
-                console.log('Extracted URL from onclick:', urlMatch[1]);
-                capturedApplicationUrl = urlMatch[1];
-            }
-        }
-
-        // Check for data attributes that might contain the URL
-        const dataAttrs = Array.from(applyButton.attributes)
-            .filter(attr => attr.name.startsWith('data-'));
-
-        dataAttrs.forEach(attr => {
-            console.log(`Data attribute ${attr.name}:`, attr.value);
-            // Look for URLs in data attributes
-            if (attr.value && (attr.value.startsWith('http') || attr.value.includes('apply'))) {
-                console.log('Possible URL found in data attribute:', attr.value);
-                capturedApplicationUrl = attr.value;
-            }
-        });
-
-        // Check for event listeners using a MutationObserver
-        setupMutationObserver(applyButton, jobId);
-
-        // Try to extract URL from JavaScript event handlers
-        extractUrlFromEventHandlers(applyButton);
-
-        // If we still don't have a URL, try to simulate a click in a controlled way
-        if (!capturedApplicationUrl) {
-            console.log('Attempting to extract URL by simulating click behavior');
-            simulateControlledClick(applyButton, jobId);
-        }
+        // Simply click the apply button to open in a new tab
+        // We don't try to capture the URL - just let the browser handle it
+        console.log('Clicking apply button to open in new tab');
+        applyButton.click();
     } else {
         console.log('Apply button not found');
-
-        // If we can't find the apply button, look for any links that might be apply links
-        const possibleApplyLinks = document.querySelectorAll('a[href*="apply"], a[href*="job"], a[href*="career"], button[data-control-name*="apply"], [role="button"][aria-label*="Apply"]');
-        console.log('Found', possibleApplyLinks.length, 'possible apply links');
-
-        possibleApplyLinks.forEach(link => {
-            const href = link.getAttribute('href');
-            console.log('Possible apply link:', href);
-
-            // If it looks like an external link, it might be the apply link
-            if (href && !href.includes('linkedin.com')) {
-                console.log('Found potential external apply link:', href);
-                capturedApplicationUrl = href;
-            }
-
-            // Also check onclick and other attributes
-            extractUrlFromEventHandlers(link);
-        });
-
-        // Look for apply button in iframes
-        const iframes = document.querySelectorAll('iframe');
-        iframes.forEach(iframe => {
-            try {
-                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                const iframeApplyButton = iframeDoc.querySelector('#jobs-apply-button-id, .jobs-apply-button, button[role="link"][aria-label*="Apply"]');
-                if (iframeApplyButton) {
-                    console.log('Found apply button in iframe');
-                    extractUrlFromEventHandlers(iframeApplyButton);
-                }
-            } catch (e) {
-                console.log('Could not access iframe content due to same-origin policy');
-            }
-        });
-    }
-}
-
-// Function to set up a mutation observer to detect URL changes
-function setupMutationObserver(applyButton, jobId) {
-    // Create a MutationObserver to watch for changes to the apply button
-    const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-            if (mutation.type === 'attributes') {
-                const href = applyButton.getAttribute('href');
-                if (href && (href.startsWith('http') || href.startsWith('/'))) {
-                    console.log('Apply button href changed:', href);
-                    capturedApplicationUrl = href.startsWith('/') ?
-                        `${window.location.origin}${href}` : href;
-                }
-            }
-        }
-    });
-
-    // Start observing the apply button for attribute changes
-    observer.observe(applyButton, { attributes: true });
-
-    // Also observe the document body for new links that might be added
-    const bodyObserver = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-            if (mutation.type === 'childList') {
-                const newLinks = document.querySelectorAll('a[href*="apply"][target="_blank"], a[href*="job"][target="_blank"]');
-                newLinks.forEach(link => {
-                    const href = link.getAttribute('href');
-                    if (href && !href.includes('linkedin.com')) {
-                        console.log('Found new external link after mutation:', href);
-                        capturedApplicationUrl = href;
-                    }
-                });
-            }
-        }
-    });
-
-    // Start observing the document body for new elements
-    bodyObserver.observe(document.body, { childList: true, subtree: true });
-}
-
-// Function to extract URLs from JavaScript event handlers
-function extractUrlFromEventHandlers(element) {
-    if (!element) return;
-
-    // Check for href attribute
-    const href = element.getAttribute('href');
-    if (href && (href.startsWith('http') || href.startsWith('/'))) {
-        console.log('Found href attribute:', href);
-        capturedApplicationUrl = href.startsWith('/') ?
-            `${window.location.origin}${href}` : href;
-        return;
-    }
-
-    // Check for data-url or similar attributes
-    const dataUrl = element.getAttribute('data-url') ||
-                   element.getAttribute('data-href') ||
-                   element.getAttribute('data-link');
-    if (dataUrl && (dataUrl.startsWith('http') || dataUrl.startsWith('/'))) {
-        console.log('Found data-url attribute:', dataUrl);
-        capturedApplicationUrl = dataUrl.startsWith('/') ?
-            `${window.location.origin}${dataUrl}` : dataUrl;
-        return;
-    }
-
-    // Check for JavaScript event handlers in HTML attributes
-    const jsHandlers = ['onclick', 'onmousedown', 'onmouseup', 'ontouchend'];
-    for (const handler of jsHandlers) {
-        const handlerCode = element.getAttribute(handler);
-        if (handlerCode) {
-            console.log(`Found ${handler} attribute:`, handlerCode);
-
-            // Look for various patterns of URL usage in JavaScript
-            const urlPatterns = [
-                /window\.open\(['"]([^'"]+)['"]/, // window.open('url')
-                /location\.href\s*=\s*['"]([^'"]+)['"]/, // location.href = 'url'
-                /location\.replace\(['"]([^'"]+)['"]/, // location.replace('url')
-                /navigate\(['"]([^'"]+)['"]/, // navigate('url')
-                /['"]https?:\/\/[^'"]+['"]/ // Any http/https URL
-            ];
-
-            for (const pattern of urlPatterns) {
-                const match = handlerCode.match(pattern);
-                if (match && match[1]) {
-                    console.log(`Extracted URL from ${handler}:`, match[1]);
-                    capturedApplicationUrl = match[1];
-                    return;
-                }
-            }
-        }
-    }
-
-    // Check for React/Angular/Vue event handlers stored in __reactEventHandlers or similar
-    for (const key in element) {
-        if (key.includes('reactEventHandlers') || key.includes('__reactProps') ||
-            key.includes('__vueEventHandlers') || key.includes('ngEventHandlers')) {
-            console.log(`Found framework event handlers: ${key}`);
-            try {
-                const handlers = element[key];
-                // Look for onClick, onPress, or similar handlers
-                for (const handlerKey in handlers) {
-                    if (handlerKey.toLowerCase().includes('click') || handlerKey.toLowerCase().includes('press')) {
-                        console.log(`Found handler: ${handlerKey}`);
-                        // We can't directly extract the URL, but we can note that we found a handler
-                        // This indicates we should rely on the navigation capture
-                    }
-                }
-            } catch (e) {
-                console.error('Error accessing event handlers:', e);
-            }
-        }
-    }
-}
-
-// Function to simulate a click in a controlled way
-function simulateControlledClick(applyButton, jobId) {
-    if (!applyButton) return;
-
-    // Create a proxy for window.open to capture the URL
-    const originalWindowOpen = window.open;
-    window.open = function(url) {
-        console.log('Intercepted window.open call with URL:', url);
-        capturedApplicationUrl = url;
-        return { closed: false }; // Return a mock window object
-    };
-
-    // Create a proxy for location changes
-    const originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, 'location');
-    let locationChangeUrl = null;
-
-    try {
-        Object.defineProperty(window, 'location', {
-            configurable: true,
-            get: function() {
-                return originalLocationDescriptor.get.call(this);
-            },
-            set: function(url) {
-                console.log('Intercepted location change to:', url);
-                locationChangeUrl = url;
-                capturedApplicationUrl = url;
-                // Don't actually change location
-            }
-        });
-
-        // Also override location.href
-        const originalHrefDescriptor = Object.getOwnPropertyDescriptor(window.location, 'href');
-        Object.defineProperty(window.location, 'href', {
-            configurable: true,
-            get: function() {
-                return originalHrefDescriptor.get.call(this);
-            },
-            set: function(url) {
-                console.log('Intercepted location.href change to:', url);
-                locationChangeUrl = url;
-                capturedApplicationUrl = url;
-                // Don't actually change location
-            }
-        });
-
-        // Create a proxy for location.replace
-        const originalReplace = window.location.replace;
-        window.location.replace = function(url) {
-            console.log('Intercepted location.replace call with URL:', url);
-            locationChangeUrl = url;
-            capturedApplicationUrl = url;
-            // Don't actually call replace
-        };
-
-        // Simulate a click on the apply button
-        console.log('Simulating click on apply button');
-        applyButton.click();
-
-        // If we captured a URL from the click, use it
-        if (locationChangeUrl) {
-            console.log('Captured URL from location change:', locationChangeUrl);
-            capturedApplicationUrl = locationChangeUrl;
-        }
-    } catch (e) {
-        console.error('Error during controlled click simulation:', e);
-    } finally {
-        // Restore original functions
-        window.open = originalWindowOpen;
-        Object.defineProperty(window, 'location', originalLocationDescriptor);
-
-        // If we have a job ID, send a message to start URL capture anyway
-        // as a fallback in case our interception didn't work
-        if (jobId) {
-            chrome.runtime.sendMessage({
-                action: "startUrlCapture",
-                jobId: jobId,
-                sourceUrl: window.location.href
-            });
-        }
     }
 }
 
@@ -401,108 +117,53 @@ function scrapeJobDetails() {
 
         // Try to extract the application URL directly
         let applicationUrl = null;
+        let applyButtonType = null;
+        let noLongerAccepting = false;
 
-        // Method 1: Look for the apply button
+        // Check if the job is no longer accepting applications (Case 1)
+        const noLongerAcceptingElement = document.querySelector('.artdeco-inline-feedback__message');
+        if (noLongerAcceptingElement && noLongerAcceptingElement.textContent.trim().includes('No longer accepting applications')) {
+            console.log('Job is no longer accepting applications');
+            noLongerAccepting = true;
+            applyButtonType = 'no_longer_accepting';
+        }
+
+        // Look for the apply button
         const applyButton = document.querySelector('#jobs-apply-button-id, .jobs-apply-button, button[role="link"][aria-label*="Apply"]');
-        if (applyButton && applyButton.hasAttribute('href')) {
-            applicationUrl = applyButton.getAttribute('href');
-            console.log('Found application URL from apply button href:', applicationUrl);
-        }
+        if (applyButton) {
+            // Check if it's an Easy Apply button (Case 2)
+            const buttonText = applyButton.textContent.trim();
+            const isEasyApply = buttonText.includes('Easy Apply') ||
+                               (applyButton.querySelector('svg[data-test-icon="linkedin-bug-xxsmall"]') !== null);
 
-        // Method 2: Look for any apply button with a link
-        if (!applicationUrl) {
-            const applyLinks = document.querySelectorAll('a[data-control-name="jobdetails_apply_button"], a.jobs-apply-button, a[role="link"][aria-label*="Apply"], a[href*="apply"], a[href*="job"][target="_blank"]');
-            if (applyLinks && applyLinks.length > 0) {
-                for (const link of applyLinks) {
-                    if (link.hasAttribute('href')) {
-                        applicationUrl = link.getAttribute('href');
-                        console.log('Found application URL from apply link:', applicationUrl);
-                        break;
-                    }
+            if (isEasyApply) {
+                console.log('Found LinkedIn Easy Apply button');
+                applyButtonType = 'easy_apply';
+                // For Easy Apply, we'll use the job URL
+                const jobId = extractJobIdFromUrl(window.location.href);
+                if (jobId) {
+                    applicationUrl = `https://www.linkedin.com/jobs/view/${jobId}/apply/`;
+                    console.log('Using LinkedIn job URL for Easy Apply:', applicationUrl);
+                }
+            } else if (buttonText.includes('Apply') && !noLongerAccepting) {
+                // This is likely an external apply button (Case 3)
+                console.log('Found external Apply button');
+                applyButtonType = 'company_site';
+
+                // For company site applications, we'll just click the button to open in a new tab
+                // We won't try to capture the URL - just let the browser handle it
+                if (applyButton) {
+                    console.log('Clicking apply button to open in new tab');
+                    applyButton.click();
                 }
             }
         }
 
-        // Method 3: Check for an iframe that might contain the application
-        if (!applicationUrl) {
-            const iframes = document.querySelectorAll('iframe[src*="apply"], iframe[src*="job"]');
-            if (iframes && iframes.length > 0) {
-                applicationUrl = iframes[0].getAttribute('src');
-                console.log('Found application URL from iframe:', applicationUrl);
-            }
-        }
+        // For company site applications (Case 3), we don't try to capture the URL
+        // We just let the browser open the application page in a new tab
 
-        // Method 4: Check for any redirects in meta tags
-        if (!applicationUrl) {
-            const metaRefresh = document.querySelector('meta[http-equiv="refresh"]');
-            if (metaRefresh) {
-                const content = metaRefresh.getAttribute('content');
-                const urlMatch = content && content.match(/URL=([^\s]+)/i);
-                if (urlMatch && urlMatch[1]) {
-                    applicationUrl = urlMatch[1];
-                    console.log('Found application URL from meta refresh:', applicationUrl);
-                }
-            }
-        }
-
-        // Method 5: Check for apply URL in script tags
-        if (!applicationUrl) {
-            const scripts = document.querySelectorAll('script');
-            for (const script of scripts) {
-                const scriptContent = script.textContent;
-                if (scriptContent) {
-                    // Look for apply URLs in script content
-                    const applyUrlMatches = scriptContent.match(/applyUrl['"']?\s*:\s*['"']([^'"']+)['"']/) ||
-                                           scriptContent.match(/apply_url['"']?\s*:\s*['"']([^'"']+)['"']/) ||
-                                           scriptContent.match(/applicationUrl['"']?\s*:\s*['"']([^'"']+)['"']/) ||
-                                           scriptContent.match(/redirectUrl['"']?\s*:\s*['"']([^'"']+)['"']/) ||
-                                           scriptContent.match(/externalApplyUrl['"']?\s*:\s*['"']([^'"']+)['"']/);
-
-                    if (applyUrlMatches && applyUrlMatches[1]) {
-                        applicationUrl = applyUrlMatches[1];
-                        console.log('Found application URL in script tag:', applicationUrl);
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Method 6: Extract from JSON-LD structured data
-        if (!applicationUrl) {
-            const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
-            for (const jsonScript of jsonLdScripts) {
-                try {
-                    const jsonData = JSON.parse(jsonScript.textContent);
-                    // Look for application URL in structured data
-                    if (jsonData.applicationUrl) {
-                        applicationUrl = jsonData.applicationUrl;
-                        console.log('Found application URL in JSON-LD data:', applicationUrl);
-                        break;
-                    } else if (jsonData.url && jsonData['@type'] === 'JobPosting') {
-                        applicationUrl = jsonData.url;
-                        console.log('Found job URL in JSON-LD data:', applicationUrl);
-                        break;
-                    }
-                } catch (e) {
-                    console.error('Error parsing JSON-LD data:', e);
-                }
-            }
-        }
-
-        // Method 7: Use the captured URL from navigation events if available
-        if (!applicationUrl && capturedApplicationUrl) {
-            applicationUrl = capturedApplicationUrl;
-            console.log('Using captured application URL from navigation event:', applicationUrl);
-        }
-
-        // Method 8: Check local storage for a URL that might have been captured by the background script
-        if (!applicationUrl) {
-            // We'll retrieve this in the message handler after scraping is complete
-            console.log('Will check local storage for captured URL after scraping');
-        }
-
-        // Method 9: Fallback to constructing a URL from the job ID
-        if (!applicationUrl) {
+        // Fallback to constructing a URL from the job ID for Easy Apply
+        if (!applicationUrl && applyButtonType === 'easy_apply') {
             const jobId = extractJobIdFromUrl(window.location.href);
             if (jobId) {
                 // Construct a fallback URL that might work for LinkedIn jobs
@@ -517,7 +178,9 @@ function scrapeJobDetails() {
             convertedDate,
             skills,
             applicantCount,
-            applicationUrl: applicationUrl || 'Not found'
+            applicationUrl: applicationUrl || 'Not found',
+            applyButtonType,
+            noLongerAccepting
         });
 
         // Return the scraped details
@@ -528,6 +191,8 @@ function scrapeJobDetails() {
             skills,
             applicantCount,
             applicationUrl,
+            applyButtonType,
+            noLongerAccepting,
             scrapedAt: new Date().toISOString()
         };
     } catch (error) {
@@ -537,7 +202,7 @@ function scrapeJobDetails() {
 }
 
 // Listen for messages from the background script
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     if (request.action === 'scrapeJobDetails') {
         console.log('Received request to scrape job details');
 
@@ -547,23 +212,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // Scrape job details
         const jobDetails = scrapeJobDetails();
 
-        // Check if we have a job ID
-        const jobId = extractJobIdFromUrl(window.location.href);
+        // We don't need to extract the job ID anymore since we're not using it for URL capture
 
-        // Check if there's a captured URL in local storage for this job
-        chrome.storage.local.get(['capturedApplicationUrls'], (data) => {
-            const capturedUrls = data.capturedApplicationUrls || {};
+        // For company site applications (Case 3), we don't need to check for captured URLs
+        // We just let the browser open the application page in a new tab
 
-            if (jobId && capturedUrls[jobId]) {
-                console.log('Found captured URL in storage for job', jobId, ':', capturedUrls[jobId]);
-                jobDetails.applicationUrl = capturedUrls[jobId];
-            }
-
-            // Send the scraped details back
-            sendResponse({
-                success: true,
-                jobDetails
-            });
+        // Send the scraped details back
+        sendResponse({
+            success: true,
+            jobDetails
         });
 
         // Return true to indicate we'll send a response asynchronously
@@ -594,9 +251,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Keep the message channel open for async response
     return true;
 });
-
-// Set up navigation capture when the script loads
-setupNavigationCapture();
 
 // Notify that the script is loaded
 console.log('Job details scraper loaded');

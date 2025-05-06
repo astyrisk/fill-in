@@ -442,8 +442,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Set application URL if available
         const applyUrlElement = document.getElementById('popup-apply-url');
-        if (job.applicationUrl) {
-            // Create a clickable link
+
+        // Handle different apply button types
+        if (job.noLongerAccepting) {
+            // Case 1: No longer accepting applications
+            applyUrlElement.textContent = 'No longer accepting applications';
+        } else if (job.applyButtonType === 'easy_apply') {
+            // Case 2: LinkedIn Easy Apply
+            if (job.applicationUrl) {
+                applyUrlElement.innerHTML = `<a href="${job.applicationUrl}" target="_blank" rel="noopener noreferrer">Apply on LinkedIn</a>`;
+            } else if (job.jobId) {
+                // Construct a LinkedIn apply URL
+                const linkedInApplyUrl = `https://www.linkedin.com/jobs/view/${job.jobId}/apply/`;
+                applyUrlElement.innerHTML = `<a href="${linkedInApplyUrl}" target="_blank" rel="noopener noreferrer">Apply on LinkedIn</a>`;
+
+                // Update the job object with the URL
+                job.applicationUrl = linkedInApplyUrl;
+
+                // Update the job in storage
+                updateJobWithDetails(job.jobId, job.country, { applicationUrl: linkedInApplyUrl });
+            } else {
+                applyUrlElement.textContent = 'LinkedIn Easy Apply (URL not available)';
+            }
+        } else if (job.applyButtonType === 'company_site') {
+            // Case 3: Apply on company site
+            // For company site applications, we'll open the job in LinkedIn and click the apply button
+            // We don't try to capture the URL - just let the browser handle it
+            const linkedInJobUrl = job.jobUrl || (job.jobId ? `https://www.linkedin.com/jobs/view/${job.jobId}/` : null);
+            if (linkedInJobUrl) {
+                applyUrlElement.innerHTML = `<a href="${linkedInJobUrl}" target="_blank" rel="noopener noreferrer">Apply on company site</a>`;
+            } else {
+                applyUrlElement.textContent = 'Apply on company site (URL not available)';
+            }
+        } else if (job.applicationUrl) {
+            // General case with URL available
             applyUrlElement.innerHTML = `<a href="${job.applicationUrl}" target="_blank" rel="noopener noreferrer">Open Application Page</a>`;
         } else {
             // Check if we have a captured URL for this job in storage
@@ -540,8 +572,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         // Update application URL if available
                         const applyUrlElement = document.getElementById('popup-apply-url');
-                        if (job.applicationUrl) {
-                            // Create a clickable link
+
+                        // Handle different apply button types
+                        if (job.noLongerAccepting) {
+                            // Case 1: No longer accepting applications
+                            applyUrlElement.textContent = 'No longer accepting applications';
+                        } else if (job.applyButtonType === 'easy_apply') {
+                            // Case 2: LinkedIn Easy Apply
+                            if (job.applicationUrl) {
+                                applyUrlElement.innerHTML = `<a href="${job.applicationUrl}" target="_blank" rel="noopener noreferrer">Apply on LinkedIn</a>`;
+                            } else if (job.jobId) {
+                                // Construct a LinkedIn apply URL
+                                const linkedInApplyUrl = `https://www.linkedin.com/jobs/view/${job.jobId}/apply/`;
+                                applyUrlElement.innerHTML = `<a href="${linkedInApplyUrl}" target="_blank" rel="noopener noreferrer">Apply on LinkedIn</a>`;
+
+                                // Update the job object with the URL
+                                job.applicationUrl = linkedInApplyUrl;
+
+                                // Update the job in storage
+                                updateJobWithDetails(job.jobId, job.country, { applicationUrl: linkedInApplyUrl });
+                            } else {
+                                applyUrlElement.textContent = 'LinkedIn Easy Apply (URL not available)';
+                            }
+                        } else if (job.applyButtonType === 'company_site') {
+                            // Case 3: Apply on company site
+                            // For company site applications, we'll open the job in LinkedIn and click the apply button
+                            // We don't try to capture the URL - just let the browser handle it
+                            const linkedInJobUrl = job.jobUrl || (job.jobId ? `https://www.linkedin.com/jobs/view/${job.jobId}/` : null);
+                            if (linkedInJobUrl) {
+                                applyUrlElement.innerHTML = `<a href="${linkedInJobUrl}" target="_blank" rel="noopener noreferrer">Apply on company site</a>`;
+                            } else {
+                                applyUrlElement.textContent = 'Apply on company site (URL not available)';
+                            }
+                        } else if (job.applicationUrl) {
+                            // General case with URL available
                             applyUrlElement.innerHTML = `<a href="${job.applicationUrl}" target="_blank" rel="noopener noreferrer">Open Application Page</a>`;
                         } else {
                             // Check if we have a captured URL for this job in storage
