@@ -1,28 +1,6 @@
 // LinkedIn Job Details Scraper
 // This script is injected into LinkedIn job pages to scrape additional job details
 
-// Variable to store the application URL captured from navigation events
-let capturedApplicationUrl = null;
-
-// Set up a function to click the apply button and open in a new tab
-function setupNavigationCapture() {
-    console.log('Setting up apply button click for external application');
-
-    // Find the apply button - try multiple selectors to ensure we find it
-    const applyButton = document.querySelector('#jobs-apply-button-id, .jobs-apply-button, button[role="link"][aria-label*="Apply"], a[data-control-name="jobdetails_apply_button"]');
-
-    if (applyButton) {
-        console.log('Found apply button, clicking to open in new tab');
-
-        // Simply click the apply button to open in a new tab
-        // We don't try to capture the URL - just let the browser handle it
-        console.log('Clicking apply button to open in new tab');
-        applyButton.click();
-    } else {
-        console.log('Apply button not found');
-    }
-}
-
 // Helper function to extract job ID from URL
 function extractJobIdFromUrl(url) {
     if (!url) return null;
@@ -128,15 +106,24 @@ function scrapeJobDetails() {
             applyButtonType = 'no_longer_accepting';
         }
 
-        // Look for the apply button
+        // Look for the apply button immediately
         const applyButton = document.querySelector('#jobs-apply-button-id, .jobs-apply-button, button[role="link"][aria-label*="Apply"]');
+
+        // Also check for Easy Apply text anywhere on the page
+        const easyApplyText = Array.from(document.querySelectorAll('*')).find(el =>
+            el.textContent && el.textContent.trim().includes('Easy Apply'));
+
+        // Check if it's an Easy Apply job based on button or text
+        // Start with checking if the URL contains 'apply' which is common for Easy Apply jobs
+        let isEasyApplyJob = window.location.href.includes('/apply/');
+
         if (applyButton) {
             // Check if it's an Easy Apply button (Case 2)
             const buttonText = applyButton.textContent.trim();
-            const isEasyApply = buttonText.includes('Easy Apply') ||
-                               (applyButton.querySelector('svg[data-test-icon="linkedin-bug-xxsmall"]') !== null);
+            isEasyApplyJob = buttonText.includes('Easy Apply') ||
+                        (applyButton.querySelector('svg[data-test-icon="linkedin-bug-xxsmall"]') !== null);
 
-            if (isEasyApply) {
+            if (isEasyApplyJob) {
                 console.log('Found LinkedIn Easy Apply button');
                 applyButtonType = 'easy_apply';
                 // For Easy Apply, we'll use the job URL
@@ -150,14 +137,80 @@ function scrapeJobDetails() {
                 console.log('Found external Apply button');
                 applyButtonType = 'company_site';
 
-                // For company site applications, we'll just click the button to open in a new tab
-                // We won't try to capture the URL - just let the browser handle it
+                // Just store the LinkedIn job posting URL for now
+                applicationUrl = window.location.href;
+                console.log('Using LinkedIn job posting URL:', applicationUrl);
+
+                /* Commented out as per user request - code to click apply button and extract URL
+                // For company site applications, we'll notify the background script to start capturing URLs
+                // and then click the button to open in a new tab without activating it
                 if (applyButton) {
-                    console.log('Clicking apply button to open in new tab');
-                    applyButton.click();
+                    // Extract job ID from the current URL
+                    const jobId = extractJobIdFromUrl(window.location.href);
+
+                    if (jobId) {
+                        // Notify the background script to start capturing URLs for this job
+                        chrome.runtime.sendMessage({
+                            action: 'startUrlCapture',
+                            jobId: jobId,
+                            sourceUrl: window.location.href
+                        }, (_response) => {
+                            if (chrome.runtime.lastError) {
+                                console.error('Error starting URL capture:', chrome.runtime.lastError);
+                            } else {
+                                console.log('URL capture started for job', jobId);
+
+                                // Click the button in a way that opens in a new tab without activating it
+                                console.log('Clicking apply button to open in new tab');
+
+                                // Create a MouseEvent that simulates ctrl+click (open in new tab)
+                                const clickEvent = new MouseEvent('click', {
+                                    bubbles: true,
+                                    cancelable: true,
+                                    view: window,
+                                    ctrlKey: true  // This makes it open in a new tab
+                                });
+
+                                // Dispatch the event to the button
+                                applyButton.dispatchEvent(clickEvent);
+                            }
+                        });
+                    } else {
+                        // If we couldn't extract the job ID, just click the button
+                        // but we'll do it in a way that opens in a new tab without activating it
+                        console.log('Clicking apply button to open in new tab (no job ID)');
+
+                        // Create a MouseEvent that simulates ctrl+click (open in new tab)
+                        const clickEvent = new MouseEvent('click', {
+                            bubbles: true,
+                            cancelable: true,
+                            view: window,
+                            ctrlKey: true  // This makes it open in a new tab
+                        });
+
+                        // Dispatch the event to the button
+                        applyButton.dispatchEvent(clickEvent);
+                    }
                 }
+                */
             }
         }
+
+        // If we didn't find an Easy Apply button but found Easy Apply text, mark as Easy Apply
+        if (!isEasyApplyJob && easyApplyText) {
+            console.log('Found Easy Apply text on the page');
+            isEasyApplyJob = true;
+            applyButtonType = 'easy_apply';
+        }
+
+        // Additional check for Easy Apply - look for the LinkedIn logo in the apply section
+        const linkedInLogo = document.querySelector('.jobs-apply-button__linkedin-logo');
+        if (linkedInLogo) {
+            console.log('Found LinkedIn logo in apply button');
+            isEasyApplyJob = true;
+            applyButtonType = 'easy_apply';
+        }
+
 
         // For company site applications (Case 3), we don't try to capture the URL
         // We just let the browser open the application page in a new tab
@@ -172,16 +225,19 @@ function scrapeJobDetails() {
             }
         }
 
-        console.log('Scraped job details:', {
-            description: description ? 'Found' : 'Not found',
-            postingDate,
-            convertedDate,
-            skills,
-            applicantCount,
-            applicationUrl: applicationUrl || 'Not found',
-            applyButtonType,
-            noLongerAccepting
-        });
+        // console.log('Scraped job details:', {
+        //     description: description ? 'Found' : 'Not found',
+        //     postingDate,
+        //     convertedDate,
+        //     skills,
+        //     applicantCount,
+        //     applicationUrl: applicationUrl || 'Not found',
+        //     applyButtonType,
+        //     noLongerAccepting
+        // });
+
+        // Use the isEasyApplyJob variable we set earlier
+        console.log('Job details scraper - isEasyApply:', isEasyApplyJob, 'applyButtonType:', applyButtonType);
 
         // Return the scraped details
         return {
@@ -193,6 +249,7 @@ function scrapeJobDetails() {
             applicationUrl,
             applyButtonType,
             noLongerAccepting,
+            isEasyApply: isEasyApplyJob,
             scrapedAt: new Date().toISOString()
         };
     } catch (error) {
@@ -201,30 +258,62 @@ function scrapeJobDetails() {
     }
 }
 
+// Variable to store the captured application URL
+let capturedApplicationUrl = null;
+
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     if (request.action === 'scrapeJobDetails') {
         console.log('Received request to scrape job details');
-
-        // Set up navigation capture to try to get the application URL
-        setupNavigationCapture();
+        console.log('Request data:', request);
 
         // Scrape job details
         const jobDetails = scrapeJobDetails();
 
-        // We don't need to extract the job ID anymore since we're not using it for URL capture
+        // If the job was already marked as Easy Apply in the initial scraping, make sure we preserve that
+        if (request.jobData && request.jobData.isEasyApply) {
+            console.log('Job was already marked as Easy Apply in initial scraping');
+            jobDetails.isEasyApply = true;
+        }
 
-        // For company site applications (Case 3), we don't need to check for captured URLs
-        // We just let the browser open the application page in a new tab
+        // Check if we have a captured URL for this job
+        const jobId = extractJobIdFromUrl(window.location.href);
+        if (jobId) {
+            // Check if we have a captured URL in storage
+            chrome.storage.local.get(['capturedApplicationUrls'], (data) => {
+                const capturedUrls = data.capturedApplicationUrls || {};
+                if (capturedUrls[jobId]) {
+                    console.log('Found captured URL in storage for job', jobId, ':', capturedUrls[jobId]);
 
-        // Send the scraped details back
-        sendResponse({
-            success: true,
-            jobDetails
-        });
+                    // Update the job details with the captured URL
+                    jobDetails.applicationUrl = capturedUrls[jobId];
 
-        // Return true to indicate we'll send a response asynchronously
-        return true;
+                    // Send the updated job details back
+                    sendResponse({
+                        success: true,
+                        jobDetails
+                    });
+                } else {
+                    // No captured URL found, send the original job details
+                    sendResponse({
+                        success: true,
+                        jobDetails
+                    });
+                }
+            });
+
+            // Return true to indicate we'll send a response asynchronously
+            return true;
+        } else {
+            // No job ID, send the original job details
+            sendResponse({
+                success: true,
+                jobDetails
+            });
+
+            // Return true to indicate we'll send a response asynchronously
+            return true;
+        }
     } else if (request.action === 'capturedApplicationUrl') {
         // Store the captured URL from the background script
         capturedApplicationUrl = request.url;

@@ -1,5 +1,5 @@
 # Fill-in
-chromium-based (Manifest V3) extension to filter related jobs from linked-in and fill in your data. I am tired of those corperate shitty forms and mentally-unstable job descriptions. 
+chromium-based (Manifest V3) extension to filter related jobs from linked-in and fill in your data. I am tired of those corperate shitty forms and mentally-unstable job descriptions.
 
 *This is a work in progress.*
 
@@ -15,8 +15,10 @@ chromium-based (Manifest V3) extension to filter related jobs from linked-in and
 
 
 ## TODO
-- [ ] fix apply url 
-- [ ] implement applied category for jobs
+- [x] fix apply url
+- [x] implement PIN, UNPIN
+- [x] applied category for jobs
+- [ ] connect it with the python script to tailor the cv
 
 ## works on the following
 - https://jobs.lever.co/instructure/8218b205-0c5c-4cc7-99a6-6ba4befec9ab/apply?source=LinkedIn
@@ -32,7 +34,7 @@ chromium-based (Manifest V3) extension to filter related jobs from linked-in and
 
 ## Supported Sites
 - General form filling - Implemented
-- Myworkday - Not implemented yet 
+- Myworkday - Not implemented yet
 - jobs.lever.co - Not implemented yet
 
 ## Planned Features
@@ -48,11 +50,4 @@ chromium-based (Manifest V3) extension to filter related jobs from linked-in and
     - Indeed - Not implemented yet
     - LinkedIn Apply Forms - Not implemented yet
     - Glassdoor Apply Forms - Not implemented yet
-
-
-## TODOs
-- [ ] fix apply url
-- [ ] implement applied category for jobs
-- [ ] export and import jobs
-- [ ] 
 

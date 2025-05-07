@@ -17,7 +17,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // Listener for messages from content scripts (optional for this basic setup,
 // but useful for more complex interactions)
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   console.log("Message received in background:", request);
 
   if (request.action === "openJobTab") {
@@ -40,7 +40,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // Handle job details scraping
   if (request.action === "scrapeJobDetails") {
-    const { jobUrl, jobId, country } = request;
+    const { jobUrl, jobId, jobData } = request;
+    console.log('Received job data for scraping:', jobData);
 
     if (!jobUrl) {
       sendResponse({ success: false, error: "No job URL provided" });
@@ -50,7 +51,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log(`Scraping details for job ${jobId} at ${jobUrl}`);
 
     // Create a new tab to load the job page but make it hidden
-    chrome.tabs.create({ url: jobUrl, active: false }, (tab) => {
+    chrome.tabs.create({ url: jobUrl, active: false}, (tab) => {
       const tabId = tab.id;
 
       // Function to scrape the job details once the page is loaded
@@ -67,13 +68,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           });
         }).then(() => {
           // Send message to the content script to scrape job details
-          chrome.tabs.sendMessage(tabId, { action: 'scrapeJobDetails' }, (response) => {
+          chrome.tabs.sendMessage(tabId, {
+            action: 'scrapeJobDetails',
+            jobData: jobData // Pass the job data to the content script
+          }, (response) => {
             // Close the tab regardless of the result
-            chrome.tabs.remove(tabId, () => {
-              if (chrome.runtime.lastError) {
-                console.log("Tab may have already been closed");
-              }
-            });
+
+            setTimeout(() => {
+              chrome.tabs.remove(tabId, () => {
+                  if (chrome.runtime.lastError) {
+                    console.log("Tab may have already been closed");
+                  }
+                });
+            }, 1000); // 5 seconds
+
+            // chrome.tabs.remove(tabId, () => {
+            //   if (chrome.runtime.lastError) {
+            //     console.log("Tab may have already been closed");
+            //   }
+            // });
 
             if (chrome.runtime.lastError) {
               console.error("Error scraping job details:", chrome.runtime.lastError);
@@ -107,7 +120,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep message channel open for async response
   }
 
-  // Handle URL capture start request
+  // Handle URL capture start request - commented out as per user request
+  /*
   if (request.action === "startUrlCapture") {
     console.log("Starting URL capture");
 
@@ -162,6 +176,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+  */
+
+  // Handle opening a URL in a background tab - removed as per user request
 
   // Add more message handlers as needed
 
@@ -186,7 +203,8 @@ chrome.commands.onCommand.addListener((command) => {
   }
 });
 
-// Set up a listener for web navigation events to capture the application URL
+// Set up a listener for web navigation events to capture the application URL - commented out as per user request
+/*
 chrome.webNavigation.onBeforeNavigate.addListener((details) => {
   // Only process main frame navigations when we're actively capturing
   if (details.frameId === 0 && isCapturingUrl) {
@@ -252,8 +270,10 @@ chrome.webNavigation.onBeforeNavigate.addListener((details) => {
     }
   }
 });
+*/
 
-// Listen for tab creation events to capture application URLs
+// Listen for tab creation events to capture application URLs - commented out as per user request
+/*
 chrome.tabs.onCreated.addListener((tab) => {
   // If we're actively capturing and a new tab is created, it might be the application page
   if (isCapturingUrl && pendingCapture) {
@@ -320,12 +340,34 @@ chrome.tabs.onCreated.addListener((tab) => {
 
               chrome.storage.local.set({ capturedApplicationUrls: capturedUrls }, () => {
                 console.log(`Stored captured application URL for job ${currentJobId} in local storage`);
+
+                // Close the tab after storing the URL
+                setTimeout(() => {
+                  chrome.tabs.remove(tabId, () => {
+                    if (chrome.runtime.lastError) {
+                      console.log("Tab may have already been closed");
+                    } else {
+                      console.log("Closed application tab after capturing URL");
+                    }
+                  });
+                }, 1000); // Wait 1 second before closing to ensure URL is stored
               });
             });
           } else {
             // Otherwise store as the last captured URL
             chrome.storage.local.set({ lastCapturedApplicationUrl: finalUrl }, () => {
               console.log("Stored captured application URL in local storage");
+
+              // Close the tab after storing the URL
+              setTimeout(() => {
+                chrome.tabs.remove(tabId, () => {
+                  if (chrome.runtime.lastError) {
+                    console.log("Tab may have already been closed");
+                  } else {
+                    console.log("Closed application tab after capturing URL");
+                  }
+                });
+              }, 1000); // Wait 1 second before closing to ensure URL is stored
             });
           }
         }
@@ -359,7 +401,7 @@ chrome.tabs.onCreated.addListener((tab) => {
 });
 
 // Listen for tab updates to capture URL changes
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, _tab) => {
   // If we're actively capturing and the URL changes, it might be the application URL
   if (isCapturingUrl && pendingCapture && changeInfo.url) {
     console.log("Tab URL changed while capturing:", tabId, changeInfo.url);
@@ -413,15 +455,47 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
           chrome.storage.local.set({ capturedApplicationUrls: capturedUrls }, () => {
             console.log(`Stored captured application URL for job ${currentJobId} in local storage`);
+
+            // Close the tab after storing the URL
+            setTimeout(() => {
+              chrome.tabs.remove(tabId, () => {
+                if (chrome.runtime.lastError) {
+                  console.log("Tab may have already been closed");
+                } else {
+                  console.log("Closed application tab after capturing URL");
+                }
+              });
+            }, 1000); // Wait 1 second before closing to ensure URL is stored
           });
         });
       } else {
         // Otherwise store as the last captured URL
         chrome.storage.local.set({ lastCapturedApplicationUrl: changeInfo.url }, () => {
           console.log("Stored captured application URL in local storage");
+
+          // Close the tab after storing the URL
+          setTimeout(() => {
+            chrome.tabs.remove(tabId, () => {
+              if (chrome.runtime.lastError) {
+                console.log("Tab may have already been closed");
+              } else {
+                console.log("Closed application tab after capturing URL");
+              }
+            });
+          }, 1000); // Wait 1 second before closing to ensure URL is stored
         });
       }
     }
+  }
+});
+*/
+
+// Keep the code that sets the job details tab ID
+chrome.tabs.onCreated.addListener((tab) => {
+  // Check if this tab was created for job details scraping
+  if (tab.url && tab.url.includes('linkedin.com/jobs/view/')) {
+    console.log("Setting job details tab ID:", tab.id);
+    jobDetailsTabId = tab.id;
   }
 });
 

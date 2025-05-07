@@ -1,0 +1,221 @@
+import yaml
+import requests
+import os
+import json
+import subprocess
+import shutil  # Add missing import for shutil
+
+# Configuration
+DEFAULT_CV_PATH = "default_cv.yaml"
+JOB_DESC_PATH = "job_description.txt"
+OUTPUT_CV_PATH = os.path.abspath("tailored_cv.yaml")
+RAW_RESPONSE_PATH = os.path.abspath("raw_response.txt")
+OPENROUTER_API_KEY = "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"  # Replace with your OpenRouter API key
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+# Step 1: Load the default CV
+def load_yaml(file_path):
+    with open(file_path, 'r') as file:
+        return yaml.safe_load(file)
+
+# Step 2: Load or input job description
+def get_job_description(file_path=None):
+    if file_path and os.path.exists(file_path):
+        with open(file_path, 'r') as file:
+            return file.read()
+    else:
+        return input("Paste the job description here:\n")
+
+# Step 3: Call OpenRouter API with DeepSeek V3 (free tier) to tailor the CV
+def tailor_cv_with_deepseek(default_cv, job_description):
+    # Get the original YAML string to show the exact format
+    with open(DEFAULT_CV_PATH, 'r') as file:
+        original_yaml_str = file.read()
+        
+    prompt = (
+        "You are an expert resume writer. I have a default CV in YAML format and a job description. "
+        "Tailor the CV to match the ats important keywords and "
+        "to optimize it for ATS systems. pick the relavant projects (4 projects) and activities. "
+        "Don't add new information. "
+        "Return *only* the tailored CV in YAML format, with no additional text "
+        "or explanations. Ensure all 'highlights' fields are simple strings (e.g., 'GPA: 4.0/5.0'). "
+        "IMPORTANT: You must preserve the exact same order of sections and fields as in the original YAML. "
+        "Do not change the structure or order of the YAML, only modify the content to match the job description. "
+        "You can change the following fields: name, date, label, details, highlights "
+        "In summary, I am a fresh graduate student, So you can start with that . "
+        "Use ** to make text bold as markdown syntax. "
+        "Also, add a field called 'filename' at the very top of the YAML with a suggested filename for the CV that includes the job title. "
+        "Here is the exact format of the original YAML:\n\n" + original_yaml_str + "\n\n"
+        "Job Description:\n" + job_description + "\n\n"
+        "Output the tailored CV in YAML format with the exact same structure and order as the original, plus the filename field at the top."
+    )
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost",
+        "X-Title": "CV Tailor Script"
+    }
+    payload = {
+        "model": "deepseek/deepseek-chat-v3-0324:free",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 2000,
+        "temperature": 0.7
+    }
+
+    response = requests.post(
+        url=OPENROUTER_API_URL,
+        headers=headers,
+        data=json.dumps(payload)
+    )
+    if response.status_code == 200:
+        tailored_cv_text = response.json()["choices"][0]["message"]["content"].strip()
+        try:
+            start_marker = "```yaml"
+            end_marker = "```"
+            if start_marker in tailored_cv_text:
+                start_idx = tailored_cv_text.index(start_marker) + len(start_marker)
+                end_idx = tailored_cv_text.index(end_marker, start_idx)
+                yaml_text = tailored_cv_text[start_idx:end_idx].strip()
+            else:
+                yaml_text = tailored_cv_text
+        except ValueError:
+            with open(RAW_RESPONSE_PATH, 'w') as f:
+                f.write(tailored_cv_text)
+            print(f"Could not extract YAML from response. Raw response saved to {RAW_RESPONSE_PATH}")
+            return None
+
+        print(tailored_cv_text)
+
+        try:
+            tailored_cv = yaml.safe_load(yaml_text)
+            return tailored_cv
+        except yaml.YAMLError as e:
+            with open(RAW_RESPONSE_PATH, 'w') as f:
+                f.write(tailored_cv_text)
+            print(f"Error parsing tailored CV YAML: {e}")
+            print(f"Raw response saved to {RAW_RESPONSE_PATH}")
+            return None
+    else:
+        with open(RAW_RESPONSE_PATH, 'w') as f:
+            f.write(response.text)
+        print(f"OpenRouter API error: {response.status_code} - {response.text}")
+        print(f"Raw response saved to {RAW_RESPONSE_PATH}")
+        return None
+
+# Step 4: Save the tailored CV
+def save_yaml(data, file_path):
+    with open(file_path, 'w') as file:
+        yaml.dump(data, file, default_flow_style=False, sort_keys=False)
+    print(f"Tailored CV saved to {file_path}")
+
+# Step 5: Render the tailored CV to PDF using RenderCV CLI
+def render_cv(yaml_path, output_pdf=None):
+    if not output_pdf:
+        output_pdf = os.path.abspath("tailored_cv.pdf")
+        
+    if not os.path.exists(yaml_path):
+        print(f"Error: YAML file {yaml_path} does not exist.")
+        return
+    try:
+        # Run rendercv without --output, let it create default output
+        subprocess.run(["rendercv", "render", yaml_path], check=True)
+        
+        # Find the generated PDF in the rendercv_output directory
+        rendercv_output_dir = os.path.join(os.path.dirname(yaml_path), "rendercv_output")
+        if os.path.exists(rendercv_output_dir):
+            # Get the base name of the YAML file without extension
+            base_name = os.path.splitext(os.path.basename(yaml_path))[0]
+            
+            # Look for PDF files in the output directory
+            pdf_files = [f for f in os.listdir(rendercv_output_dir) if f.endswith('.pdf')]
+            
+            if pdf_files:
+                # Use the first PDF file found (there should typically be only one)
+                default_pdf = os.path.join(rendercv_output_dir, pdf_files[0])
+                # Move the default PDF to desired location
+                shutil.move(default_pdf, output_pdf)
+                print(f"PDF generated: {output_pdf}")
+                return True
+            else:
+                # If no PDF found, look for HTML files that might need conversion
+                html_files = [f for f in os.listdir(rendercv_output_dir) if f.endswith('.html')]
+                if html_files:
+                    print(f"Found HTML file but no PDF. You may need to convert it manually.")
+                    return False
+                else:
+                    print(f"No output files found in {rendercv_output_dir}")
+                    return False
+        else:
+            print(f"Output directory {rendercv_output_dir} not found")
+            return False
+    except subprocess.CalledProcessError as e:
+        print(f"Error running RenderCV CLI: {e}")
+        with open(yaml_path, 'r') as f:
+            print(f"Contents of {yaml_path}:\n{f.read()}")
+        return False
+    except Exception as e:
+        print(f"Error generating PDF: {e}")
+        return False
+
+# Main execution
+def main():
+    default_cv = load_yaml(DEFAULT_CV_PATH)
+    if not default_cv:
+        print("Error loading default CV.")
+        return
+
+    job_description = get_job_description(JOB_DESC_PATH)
+    if not job_description:
+        print("No job description provided.")
+        return
+
+    tailored_cv = tailor_cv_with_deepseek(default_cv, job_description)
+    if not tailored_cv:
+        print("Failed to tailor CV.")
+        return
+    
+    # Extract filename if provided
+    pdf_filename = "tailored_cv.pdf"  # Default filename
+    if 'filename' in tailored_cv:
+        suggested_filename = tailored_cv.pop('filename')  # Remove from CV data
+        if suggested_filename:
+            # Ensure it has .pdf extension
+            if not suggested_filename.lower().endswith('.pdf'):
+                suggested_filename += '.pdf'
+            pdf_filename = suggested_filename
+    
+    pdf_filename = pdf_filename.replace(".yaml", "")
+    print("pdf filename: ", pdf_filename)
+    # Save the temporary output path for the PDF
+    temp_output_pdf_path = os.path.abspath("temp_tailored_cv.pdf")
+    final_output_pdf_path = os.path.abspath(pdf_filename)
+    
+    save_yaml(tailored_cv, OUTPUT_CV_PATH)
+    
+    # Render the CV
+    success = render_cv(OUTPUT_CV_PATH, output_pdf=pdf_filename)
+    
+    if success:
+        # Find the actual generated PDF in rendercv_output directory
+        rendercv_output_dir = os.path.join(os.path.dirname(OUTPUT_CV_PATH), "rendercv_output")
+        if os.path.exists(rendercv_output_dir):
+            pdf_files = [f for f in os.listdir(rendercv_output_dir) if f.endswith('.pdf')]
+            if pdf_files:
+                # Get the first PDF file (there should typically be only one)
+                generated_pdf = os.path.join(rendercv_output_dir, pdf_files[0])
+                
+                # Copy to the final destination with the suggested filename
+                shutil.copy2(generated_pdf, final_output_pdf_path)
+                print(f"CV tailored and saved as {pdf_filename}")
+            else:
+                print("No PDF file was generated in the rendercv_output directory.")
+        else:
+            print(f"Output directory {rendercv_output_dir} not found")
+    else:
+        print("Failed to generate PDF.")
+
+if __name__ == "__main__":
+    main()

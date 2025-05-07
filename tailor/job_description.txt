@@ -1,0 +1,64 @@
+Silicon Labs (NASDAQ: SLAB) is the leading innovator in low-power wireless connectivity, building embedded technology that connects devices and improves lives. Merging cutting-edge technology into the world’s most highly integrated SoCs, Silicon Labs provides device makers the solutions, support, and ecosystems needed to create advanced edge connectivity applications. Headquartered in Austin, Texas, Silicon Labs has operations in over 16 countries and is the trusted partner for innovative solutions in the smart home, industrial IoT, and smart cities markets. Learn more at www.silabs.com.
+
+About The Role
+
+Silicon Labs is looking for a Software Engineer in Test to play key role in planning, developing, debugging and automating test scripts. The primary objective is to enhance the overall quality of the Silicon Labs Gecko SDK and Firmware product. Most of our customers are focused on building Internet of Things (IoT) products, ranging from smart homes to smart cities and smart metering.
+
+As a member of the Budapest QA team, you will be tasked with ensuring comprehensive test coverage for Bluetooth Low Energy radio protocol features. You will be responsible for validating our embedded products using a Python-based automated test framework. You will frequently interact with the Software Development Team based in Budapest, Espoo (Finland), and other Software Quality Assurance (SQA) groups globally.
+
+In this role, you will get to work with cutting-edge Silicon Labs Wireless products while ensuring that our products meet the requirement of the Bluetooth standards. Our Budapest SQA Team is responsible for validating our embedded products.
+
+Technologies we use
+
+Python, Pytest, Jenkins, GitHub, Docker, Git, Cloud Based Computing, SQL Database, Windows, Linux.
+
+What You Will Do
+
+Perform functional and non-functional automated tests for Silicon Labs’ embedded wireless products.
+Design and implement pytest-based tests for our embedded wireless solutions.
+Automate and regularly monitor test execution as part of continuous integration.
+Utilize generative AI tools, such as GitHub Copilot, to enhance coding efficiency and leverage other benefits.
+Work closely with development teams to create detailed test plans and debug issues found during the test cycle.
+Collaborate with application engineers to identify use cases that require automated test coverage.
+Maintain, manage, and improve automated test scripts.
+Operate within an Agile test environment.
+
+
+Skills Needed
+
+0-2 years of work experience in test automation. This is an entry-level position, and new college graduates are also welcome to apply.
+Knowledge of scripting languages, particularly Python.
+Hands-on experience with automation.
+Experience in working together with small technical teams.
+Communicate well and work well in a small cross-functional teams.
+Ability to quickly learn new technologies.
+
+
+We Consider The Following Experience a Plus
+
+Experience with IoT wireless solutions and communication protocols.
+Experience with continuous integration techniques and test automation systems.
+Familiarity with generative AI tools, particularly GitHub Copilot.
+Knowledge of C and/or embedded C.
+
+
+Education
+
+BSc/MSc in Computer Science or related field.
+
+
+Budapest Perks & Benefits
+
+You would be working from our office in Budapest, in Graphisoft Park, next to the riverbank of the Danube.
+
+We also offer:
+
+Annual Budapest travel card or parking in the office garage 
+Great cafeteria system 
+Opportunity to join Employment Stock Purchase Plan 
+Private health care access 
+Life and accident insurance for every employee 
+Contribution to a voluntary private pension fund 
+AYCM card option 
+Paid days for philanthropy 
+

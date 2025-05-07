@@ -106,37 +106,7 @@ button:hover {
     background-color: #c0392b;
 }
 
-.job-archive-button {
-    background-color: #3498db;
-    color: white;
-    border: none;
-    padding: 6px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: bold;
-    margin-left: 5px;
-}
-
-.job-archive-button:hover {
-    background-color: #2980b9;
-}
-
-.job-delete-button {
-    background-color: #e74c3c;
-    color: white;
-    border: none;
-    padding: 6px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: bold;
-    margin-left: 5px;
-}
-
-.job-delete-button:hover {
-    background-color: #c0392b;
-}
+/* Archive/Unarchive/Delete button styles moved to unified section */
 
 /* Confirmation Dialog */
 .confirmation-dialog {
@@ -187,6 +157,28 @@ button:hover {
     padding: 16px;
     margin-bottom: 16px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    position: relative;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.job-card.fade-out {
+    opacity: 0;
+    transform: translateX(-20px);
+}
+
+@keyframes highlight-pulse {
+    0% { background-color: white; }
+    50% { background-color: #e8f7f0; }
+    100% { background-color: white; }
+}
+
+.job-card.highlight-effect {
+    animation: highlight-pulse 0.5s ease;
+}
+
+.job-card.pinned {
+    border-left: 4px solid #f39c12;
+    background-color: #fffbf0;
 }
 
 .job-header {
@@ -231,6 +223,14 @@ button:hover {
     background-color: #5f2da0;
 }
 
+.job-badge.pinned {
+    background-color: #f39c12;
+}
+
+.job-badge.applied {
+    background-color: #27ae60;
+}
+
 .job-company {
     font-weight: bold;
     margin-bottom: 4px;
@@ -261,6 +261,7 @@ button:hover {
     color: #999;
     font-size: 12px;
     margin-left: auto;
+    align-self: center;
 }
 
 .job-actions {
@@ -269,21 +270,104 @@ button:hover {
     align-items: center;
 }
 
-.apply-button {
+/* Unified button styles for all job action buttons */
+.job-actions .apply-button,
+.job-actions .job-archive-button,
+.job-actions .job-unarchive-button,
+.job-actions .job-delete-button,
+.job-actions .job-pin-button,
+.job-actions .job-unpin-button,
+.job-actions .job-applied-button,
+.job-actions .job-unapplied-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
     background-color: #0073b1;
     color: white;
     border: none;
-    padding: 8px 16px;
+    padding: 6px 10px;
     border-radius: 4px;
     cursor: pointer;
     text-decoration: none;
     display: inline-block;
+    font-size: 13px;
+    font-weight: bold;
 }
 
-.apply-button:hover {
+/* Hover effect for all buttons */
+.job-actions .apply-button:hover,
+.job-actions .job-archive-button:hover,
+.job-actions .job-unarchive-button:hover,
+.job-actions .job-pin-button:hover,
+.job-actions .job-unpin-button:hover,
+.job-actions .job-applied-button:hover,
+.job-actions .job-unapplied-button:hover {
     background-color: #005582;
 }
 
+/* Special color for pin/unpin buttons */
+.job-actions .job-pin-button,
+.job-actions .job-unpin-button,
+.job-pin-corner {
+    min-width: 36px;
+    background-color: #f39c12;
+}
+
+/* Pin button in corner */
+.job-pin-corner {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    border-radius: 4px 0 0 4px;
+    padding: 8px 8px;
+    z-index: 10;
+    box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    opacity: 0.7;
+}
+
+.job-card:hover .job-pin-corner {
+    opacity: 1;
+}
+
+.job-actions .job-pin-button:hover,
+.job-actions .job-unpin-button:hover,
+.job-pin-corner:hover {
+    background-color: #e67e22;
+}
+
+/* Special styles for action buttons */
+.job-actions .job-archive-button,
+.job-actions .job-unarchive-button,
+.job-actions .job-applied-button,
+.job-actions .job-unapplied-button {
+    min-width: 36px;
+}
+
+/* Special color for applied/unapplied button */
+.job-actions .job-applied-button,
+.job-actions .job-unapplied-button {
+    background-color: #27ae60;
+}
+
+.job-actions .job-applied-button:hover,
+.job-actions .job-unapplied-button:hover {
+    background-color: #219653;
+}
+
+/* Special color for delete button */
+.job-actions .job-delete-button {
+    min-width: 36px;
+    background-color: #e74c3c;
+}
+
+.job-actions .job-delete-button:hover {
+    background-color: #c0392b;
+}
+
+/* Loading state for the view button */
 .apply-button.loading {
     background-color: #999;
     cursor: wait;
