@@ -3,7 +3,8 @@ import requests
 import os
 import json
 import subprocess
-import shutil  # Add missing import for shutil
+import shutil
+from flask import Flask, request, jsonify, send_file
 
 # Configuration
 DEFAULT_CV_PATH = "default_cv.yaml"
@@ -12,6 +13,8 @@ OUTPUT_CV_PATH = os.path.abspath("tailored_cv.yaml")
 RAW_RESPONSE_PATH = os.path.abspath("raw_response.txt")
 OPENROUTER_API_KEY = "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"  # Replace with your OpenRouter API key
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+app = Flask(__name__)
 
 # Step 1: Load the default CV
 def load_yaml(file_path):
@@ -31,7 +34,7 @@ def tailor_cv_with_deepseek(default_cv, job_description):
     # Get the original YAML string to show the exact format
     with open(DEFAULT_CV_PATH, 'r') as file:
         original_yaml_str = file.read()
-        
+
     prompt = (
         "You are an expert resume writer. I have a default CV in YAML format and a job description. "
         "Tailor the CV to match the ats important keywords and "
@@ -115,23 +118,23 @@ def save_yaml(data, file_path):
 def render_cv(yaml_path, output_pdf=None):
     if not output_pdf:
         output_pdf = os.path.abspath("tailored_cv.pdf")
-        
+
     if not os.path.exists(yaml_path):
         print(f"Error: YAML file {yaml_path} does not exist.")
         return
     try:
         # Run rendercv without --output, let it create default output
         subprocess.run(["rendercv", "render", yaml_path], check=True)
-        
+
         # Find the generated PDF in the rendercv_output directory
         rendercv_output_dir = os.path.join(os.path.dirname(yaml_path), "rendercv_output")
         if os.path.exists(rendercv_output_dir):
             # Get the base name of the YAML file without extension
             base_name = os.path.splitext(os.path.basename(yaml_path))[0]
-            
+
             # Look for PDF files in the output directory
             pdf_files = [f for f in os.listdir(rendercv_output_dir) if f.endswith('.pdf')]
-            
+
             if pdf_files:
                 # Use the first PDF file found (there should typically be only one)
                 default_pdf = os.path.join(rendercv_output_dir, pdf_files[0])
@@ -176,28 +179,30 @@ def main():
     if not tailored_cv:
         print("Failed to tailor CV.")
         return
-    
+
     # Extract filename if provided
     pdf_filename = "tailored_cv.pdf"  # Default filename
     if 'filename' in tailored_cv:
         suggested_filename = tailored_cv.pop('filename')  # Remove from CV data
         if suggested_filename:
+            # Remove .yaml if present in the filename
+            suggested_filename = suggested_filename.replace(".yaml", "")
+
             # Ensure it has .pdf extension
             if not suggested_filename.lower().endswith('.pdf'):
                 suggested_filename += '.pdf'
             pdf_filename = suggested_filename
-    
-    pdf_filename = pdf_filename.replace(".yaml", "")
+
     print("pdf filename: ", pdf_filename)
     # Save the temporary output path for the PDF
     temp_output_pdf_path = os.path.abspath("temp_tailored_cv.pdf")
     final_output_pdf_path = os.path.abspath(pdf_filename)
-    
+
     save_yaml(tailored_cv, OUTPUT_CV_PATH)
-    
+
     # Render the CV
     success = render_cv(OUTPUT_CV_PATH, output_pdf=pdf_filename)
-    
+
     if success:
         # Find the actual generated PDF in rendercv_output directory
         rendercv_output_dir = os.path.join(os.path.dirname(OUTPUT_CV_PATH), "rendercv_output")
@@ -206,7 +211,7 @@ def main():
             if pdf_files:
                 # Get the first PDF file (there should typically be only one)
                 generated_pdf = os.path.join(rendercv_output_dir, pdf_files[0])
-                
+
                 # Copy to the final destination with the suggested filename
                 shutil.copy2(generated_pdf, final_output_pdf_path)
                 print(f"CV tailored and saved as {pdf_filename}")
@@ -217,5 +222,71 @@ def main():
     else:
         print("Failed to generate PDF.")
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"})
+
+@app.route('/tailor', methods=['POST'])
+def tailor_endpoint():
+    data = request.json
+
+    if not data or 'job_description' not in data:
+        return jsonify({"error": "Job description is required"}), 400
+
+    job_description = data.get('job_description')
+    # print("job description", job_description)
+
+    # Load default CV
+    default_cv = load_yaml(DEFAULT_CV_PATH)
+    if not default_cv:
+        return jsonify({"error": "Error loading default CV"}), 500
+
+    # Tailor the CV
+    tailored_cv = tailor_cv_with_deepseek(default_cv, job_description)
+    if not tailored_cv:
+        return jsonify({"error": "Failed to tailor CV"}), 500
+
+    # Extract filename if provided
+    pdf_filename = "tailored_cv.pdf"  # Default filename
+    if 'filename' in tailored_cv:
+        suggested_filename = tailored_cv.pop('filename')  # Remove from CV data
+        if suggested_filename:
+            # Remove .yaml if present in the filename
+            suggested_filename = suggested_filename.replace(".yaml", "")
+
+            # Ensure it has .pdf extension
+            if not suggested_filename.lower().endswith('.pdf'):
+                suggested_filename += '.pdf'
+            pdf_filename = suggested_filename
+
+    # Save the tailored CV
+    save_yaml(tailored_cv, OUTPUT_CV_PATH)
+
+    # Generate PDF
+    success = render_cv(OUTPUT_CV_PATH, output_pdf=pdf_filename)
+
+    if success:
+        pdf_path = os.path.abspath(pdf_filename)
+        if os.path.exists(pdf_path):
+            # Instead of sending the file, return a success message with the filename
+            return jsonify({
+                "success": True,
+                "message": f"CV tailored successfully as {pdf_filename}",
+                "filename": pdf_filename
+            })
+        else:
+            return jsonify({"error": "PDF was generated but file not found"}), 500
+    else:
+        return jsonify({"error": "Failed to generate PDF"}), 500
+
+def run_server(port=5000):
+    app.run(host='0.0.0.0', port=port, debug=True)
+
 if __name__ == "__main__":
-    main()
+    import sys
+
+    if len(sys.argv) > 1 and sys.argv[1] == "server":
+        port = int(os.environ.get('PORT', 5000))
+        run_server(port)
+    else:
+        main()

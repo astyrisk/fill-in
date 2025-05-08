@@ -20,6 +20,31 @@ function scrapeJobDetails() {
         const descriptionElement = document.querySelector('.jobs-description__content');
         const description = descriptionElement ? descriptionElement.innerHTML : null;
 
+        // Extract job type information (Hybrid Full-time Mid-Senior level, etc.)
+        let jobTypeInfo = null;
+        const jobInsightElement = document.querySelector('.job-details-jobs-unified-top-card__job-insight--highlight');
+        if (jobInsightElement) {
+            // Extract all text content from spans inside the job insight element
+            const spans = jobInsightElement.querySelectorAll('span[aria-hidden="true"], span.job-details-jobs-unified-top-card__job-insight-view-model-secondary');
+            const jobTypeTexts = [];
+
+            spans.forEach(span => {
+                const text = span.textContent.trim();
+                if (text && !text.includes('Skills:')) {
+                    // Clean up the text by removing comment markers
+                    const cleanText = text.replace(/<!---->/g, '').trim();
+                    if (cleanText) {
+                        jobTypeTexts.push(cleanText);
+                    }
+                }
+            });
+
+            if (jobTypeTexts.length > 0) {
+                jobTypeInfo = jobTypeTexts.join(' ');
+                console.log('Extracted job type info:', jobTypeInfo);
+            }
+        }
+
         // Extract posting date
         const dateElements = document.querySelectorAll('.tvm__text');
         let postingDate = null;
@@ -250,6 +275,7 @@ function scrapeJobDetails() {
             applyButtonType,
             noLongerAccepting,
             isEasyApply: isEasyApplyJob,
+            jobTypeInfo, // Add the job type information (Hybrid Full-time Mid-Senior level, etc.)
             scrapedAt: new Date().toISOString()
         };
     } catch (error) {

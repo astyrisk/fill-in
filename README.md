@@ -18,7 +18,15 @@ chromium-based (Manifest V3) extension to filter related jobs from linked-in and
 - [x] fix apply url
 - [x] implement PIN, UNPIN
 - [x] applied category for jobs
-- [ ] connect it with the python script to tailor the cv
+- [x] connect it with the python script to tailor the cv
+- [ ] tailor to handle multiple requests at the same time
+- [ ] shows a notification when the resume is done
+
+- [ ] when you click archive, the ui needs to updated correctly
+
+- [ ] when you archive or apply a job, remove the pin
+
+- [ ] myworkday support
 
 ## works on the following
 - https://jobs.lever.co/instructure/8218b205-0c5c-4cc7-99a6-6ba4befec9ab/apply?source=LinkedIn
@@ -50,4 +58,7 @@ chromium-based (Manifest V3) extension to filter related jobs from linked-in and
     - Indeed - Not implemented yet
     - LinkedIn Apply Forms - Not implemented yet
     - Glassdoor Apply Forms - Not implemented yet
+
+
+
 

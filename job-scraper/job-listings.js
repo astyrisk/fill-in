@@ -27,6 +27,18 @@ document.addEventListener('DOMContentLoaded', () => {
     popupClose.addEventListener('click', closePopup);
     popupOverlay.addEventListener('click', closePopup);
 
+    // Add event listener for the tailor CV button
+    const tailorCvButton = document.getElementById('tailor-cv-button');
+    let currentJobForTailoring = null;
+
+    tailorCvButton.addEventListener('click', () => {
+        if (currentJobForTailoring && currentJobForTailoring.description) {
+            tailorCV(currentJobForTailoring.description, currentJobForTailoring.title);
+        } else {
+            document.getElementById('tailor-cv-status').textContent = 'No job description available for tailoring';
+        }
+    });
+
     // Load job listings from storage
     loadJobListings();
 
@@ -565,6 +577,63 @@ document.addEventListener('DOMContentLoaded', () => {
         scrapeInfo.textContent = statusText;
     }
 
+    // Function to tailor CV with job description
+    function tailorCV(jobDescription, jobTitle) {
+        console.log('Tailoring CV with job description');
+
+        // Get the tailor button and status elements
+        const tailorButton = document.getElementById('tailor-cv-button');
+        const tailorStatus = document.getElementById('tailor-cv-status');
+
+        // Disable the button and show loading status
+        tailorButton.disabled = true;
+        tailorStatus.textContent = 'Tailoring CV...';
+
+        // Send the job description to the tailor server
+        fetch('http://localhost:5000/tailor', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                job_description: jobDescription
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Server responded with status: ${response.status}`);
+            }
+
+            // Parse the JSON response
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            if (data.success) {
+                // Update status with success message
+                tailorStatus.textContent = data.message || 'CV tailored successfully!';
+
+                // Re-enable the button after a delay
+                setTimeout(() => {
+                    tailorButton.disabled = false;
+                }, 3000);
+            } else {
+                // Handle unexpected response format
+                throw new Error('Unexpected response from server');
+            }
+        })
+        .catch(error => {
+            console.error('Error tailoring CV:', error);
+            tailorStatus.textContent = `Error: ${error.message}`;
+
+            // Re-enable the button
+            tailorButton.disabled = false;
+        });
+    }
+
     // Function to open the popup and display job details
     function openJobDetailsPopup(job) {
         console.log('Opening job details popup for:', job);
@@ -588,6 +657,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Set application count if available
         document.getElementById('popup-applications').textContent = job.applicantCount || 'Not available';
+
+        // Set job type information if available
+        document.getElementById('popup-job-type').textContent = job.jobTypeInfo || 'Not available';
 
         // Set application URL if available
         const applyUrlElement = document.getElementById('popup-apply-url');
@@ -724,6 +796,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Update the popup with the new details
                         if (job.description) {
                             descriptionContainer.innerHTML = job.description;
+
+                            // Enable the tailor CV button since we now have a job description
+                            const tailorCvButton = document.getElementById('tailor-cv-button');
+                            tailorCvButton.disabled = false;
+                            document.getElementById('tailor-cv-status').textContent = '';
                         } else {
                             descriptionContainer.innerHTML = '<div>No job description available</div>';
                         }
@@ -751,6 +828,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             document.getElementById('popup-posted').textContent = job.postingDate || 'Not available';
                         }
                         document.getElementById('popup-applications').textContent = job.applicantCount || 'Not available';
+
+                        // Update job type information if available
+                        document.getElementById('popup-job-type').textContent = job.jobTypeInfo || 'Not available';
 
                         // Update application URL if available
                         const applyUrlElement = document.getElementById('popup-apply-url');
@@ -854,6 +934,21 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 descriptionContainer.innerHTML = '<div>No job description available</div>';
             }
+        }
+
+        // Set the current job for tailoring
+        currentJobForTailoring = job;
+
+        // Reset the tailor CV status
+        document.getElementById('tailor-cv-status').textContent = '';
+
+        // Enable or disable the tailor CV button based on whether we have a job description
+        const tailorCvButton = document.getElementById('tailor-cv-button');
+        if (job.description) {
+            tailorCvButton.disabled = false;
+        } else {
+            tailorCvButton.disabled = true;
+            document.getElementById('tailor-cv-status').textContent = 'No job description available for tailoring';
         }
 
         // Show the popup
@@ -1017,6 +1112,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 <div class="job-actions">
                     <a href="javascript:void(0)" class="apply-button view-job-btn" data-job-id="${job.jobId || ''}" data-job-url="${job.jobUrl}" data-job-country="${job.country || ''}" title="View job details"><i class="fas fa-eye"></i> View</a>
+                    <a href="${job.jobUrl || (job.jobId ? `https://www.linkedin.com/jobs/view/${job.jobId}/` : '#')}" target="_blank" class="apply-button linkedin-btn" title="Open LinkedIn job page"><i class="fab fa-linkedin"></i> LinkedIn</a>
                     ${job.country === 'Archive' ?
                         `<button class="job-unarchive-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" data-original-country="${job.originalCountry || 'Unknown'}" title="Unarchive this job"><i class="fas fa-box-open"></i></button>` :
                         `<button class="job-archive-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Archive this job"><i class="fas fa-archive"></i></button>`

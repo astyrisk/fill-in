@@ -278,7 +278,8 @@ button:hover {
 .job-actions .job-pin-button,
 .job-actions .job-unpin-button,
 .job-actions .job-applied-button,
-.job-actions .job-unapplied-button {
+.job-actions .job-unapplied-button,
+.job-actions .linkedin-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -295,6 +296,11 @@ button:hover {
     font-weight: bold;
 }
 
+/* LinkedIn button specific style */
+.job-actions .linkedin-btn {
+    background-color: #0a66c2;
+}
+
 /* Hover effect for all buttons */
 .job-actions .apply-button:hover,
 .job-actions .job-archive-button:hover,
@@ -304,6 +310,11 @@ button:hover {
 .job-actions .job-applied-button:hover,
 .job-actions .job-unapplied-button:hover {
     background-color: #005582;
+}
+
+/* LinkedIn button hover effect */
+.job-actions .linkedin-btn:hover {
+    background-color: #004182;
 }
 
 /* Special color for pin/unpin buttons */
@@ -503,4 +514,31 @@ button:hover {
     padding: 20px;
     font-style: italic;
     color: #666;
+}
+
+/* Tailor CV Button Styles */
+.tailor-cv-button {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-right: 10px;
+}
+
+.tailor-cv-button:hover {
+    background-color: #219653;
+}
+
+.tailor-cv-button:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+}
+
+#tailor-cv-status {
+    font-size: 14px;
+    color: #666;
+    font-style: italic;
 }
