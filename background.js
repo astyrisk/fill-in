@@ -8,6 +8,9 @@ let sourceJobUrl = null;
 let pendingCapture = false;
 let captureTimeoutId = null;
 
+// CV tailoring is now handled directly in job-listings.js with per-job status tracking
+// No global notification system is needed anymore
+
 // Listener for when the extension is first installed or updated
 chrome.runtime.onInstalled.addListener(() => {
   console.log("Form Fill Helper Extension Installed/Updated.");
@@ -179,6 +182,9 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   */
 
   // Handle opening a URL in a background tab - removed as per user request
+
+  // Tailor notification control has been removed
+  // CV tailoring status is now tracked per job in job-listings.js
 
   // Add more message handlers as needed
 

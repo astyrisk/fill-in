@@ -1,3 +1,139 @@
+// Function to update the tailoring status for a job
+function updateJobTailoringStatus(jobId, country, status, filename = null) {
+    if (!jobId || !country) {
+        console.error('Cannot update tailoring status: Missing job ID or country');
+        return;
+    }
+
+    chrome.storage.local.get(['linkedInJobsByCountry'], (data) => {
+        if (!data.linkedInJobsByCountry || !data.linkedInJobsByCountry[country]) {
+            console.error(`Cannot update tailoring status: Country ${country} not found`);
+            return;
+        }
+
+        // Find the job in the country's job list
+        const countryJobs = data.linkedInJobsByCountry[country];
+        const jobIndex = countryJobs.findIndex(job => job.jobId === jobId);
+
+        if (jobIndex === -1) {
+            console.error(`Cannot update tailoring status: Job ${jobId} not found in ${country}`);
+            return;
+        }
+
+        // Update the job with tailoring status
+        countryJobs[jobIndex].tailoringStatus = status;
+
+        // If a filename is provided, store it
+        if (filename) {
+            countryJobs[jobIndex].tailoredCvFilename = filename;
+        } else if (status === null) {
+            // If we're resetting the status, also remove the filename
+            delete countryJobs[jobIndex].tailoredCvFilename;
+        }
+
+        // Save the updated data
+        chrome.storage.local.set({
+            linkedInJobsByCountry: data.linkedInJobsByCountry,
+            linkedInJobs: Object.values(data.linkedInJobsByCountry).flat() // Update flat list for backward compatibility
+        }, () => {
+            console.log(`Updated tailoring status for job ${jobId} to ${status || 'reset'}`);
+
+            // Update the UI for this job if it's currently displayed
+            updateTailoringStatusUI(jobId, status, filename);
+        });
+    });
+}
+
+// Function to reset the tailoring status for a job
+function resetJobTailoringStatus(jobId, country) {
+    if (!jobId || !country) {
+        console.error('Cannot reset tailoring status: Missing job ID or country');
+        return;
+    }
+
+    // Update the job with null status to reset it
+    updateJobTailoringStatus(jobId, country, null);
+}
+
+// Function to update the tailoring status UI for a specific job
+function updateTailoringStatusUI(jobId, status, filename = null) {
+    // Find the job card for this job ID
+    const jobCard = document.querySelector(`.job-card [data-job-id="${jobId}"]`)?.closest('.job-card');
+    if (!jobCard) return;
+
+    // Find or create the tailoring status element
+    let tailoringStatusEl = jobCard.querySelector('.job-tailoring-status');
+
+    // If status is null (reset) and there's no existing element, nothing to do
+    if (status === null && !tailoringStatusEl) return;
+
+    // If status is null (reset) and there is an element, remove it
+    if (status === null && tailoringStatusEl) {
+        tailoringStatusEl.remove();
+        return;
+    }
+
+    // Create the element if it doesn't exist
+    if (!tailoringStatusEl) {
+        tailoringStatusEl = document.createElement('span');
+        tailoringStatusEl.className = 'job-tailoring-status';
+
+        // Insert it after the delete button in the job actions div
+        const jobActions = jobCard.querySelector('.job-actions');
+        if (jobActions) {
+            const deleteButton = jobCard.querySelector('.job-delete-button');
+            if (deleteButton && deleteButton.nextSibling) {
+                jobActions.insertBefore(tailoringStatusEl, deleteButton.nextSibling);
+            } else {
+                // If delete button not found or it's the last element, append to the end
+                jobActions.appendChild(tailoringStatusEl);
+            }
+        }
+    }
+
+    // Update the status display
+    switch (status) {
+        case 'queued':
+            tailoringStatusEl.innerHTML = '<i class="fas fa-hourglass-start"></i> CV Queued <button class="reset-cv-status-btn" data-job-id="' + jobId + '" data-job-country="' + jobCard.querySelector('[data-job-country]').getAttribute('data-job-country') + '" title="Reset CV status"><i class="fas fa-times"></i></button>';
+            tailoringStatusEl.className = 'job-tailoring-status queued';
+            break;
+        case 'processing':
+            tailoringStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> CV Processing <button class="reset-cv-status-btn" data-job-id="' + jobId + '" data-job-country="' + jobCard.querySelector('[data-job-country]').getAttribute('data-job-country') + '" title="Reset CV status"><i class="fas fa-times"></i></button>';
+            tailoringStatusEl.className = 'job-tailoring-status processing';
+            break;
+        case 'completed':
+            tailoringStatusEl.innerHTML = `<i class="fas fa-check-circle"></i> CV Ready${filename ? `: ${filename}` : ''} <button class="reset-cv-status-btn" data-job-id="${jobId}" data-job-country="${jobCard.querySelector('[data-job-country]').getAttribute('data-job-country')}" title="Reset CV status"><i class="fas fa-times"></i></button>`;
+            tailoringStatusEl.className = 'job-tailoring-status completed';
+            break;
+        case 'failed':
+            tailoringStatusEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> CV Failed <button class="reset-cv-status-btn" data-job-id="' + jobId + '" data-job-country="' + jobCard.querySelector('[data-job-country]').getAttribute('data-job-country') + '" title="Reset CV status"><i class="fas fa-times"></i></button>';
+            tailoringStatusEl.className = 'job-tailoring-status failed';
+            break;
+        default:
+            tailoringStatusEl.innerHTML = '';
+            tailoringStatusEl.className = 'job-tailoring-status';
+    }
+
+    // Add event listener for the reset button if it exists
+    const resetButton = tailoringStatusEl.querySelector('.reset-cv-status-btn');
+    if (resetButton) {
+        resetButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation(); // Prevent event from bubbling up
+
+            const jobId = this.getAttribute('data-job-id');
+            const country = this.getAttribute('data-job-country');
+
+            if (jobId && country) {
+                resetJobTailoringStatus(jobId, country);
+            }
+        });
+    }
+}
+
+// We no longer need to listen for messages from the background script
+// since we're handling tailoring status directly in the job objects
+
 document.addEventListener('DOMContentLoaded', () => {
     const jobListingsContainer = document.getElementById('job-listings-container');
     const scrapeInfo = document.getElementById('scrape-info');
@@ -33,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     tailorCvButton.addEventListener('click', () => {
         if (currentJobForTailoring && currentJobForTailoring.description) {
-            tailorCV(currentJobForTailoring.description, currentJobForTailoring.title);
+            tailorCV(currentJobForTailoring.description);
         } else {
             document.getElementById('tailor-cv-status').textContent = 'No job description available for tailoring';
         }
@@ -578,8 +714,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Function to tailor CV with job description
-    function tailorCV(jobDescription, jobTitle) {
+    function tailorCV(jobDescription) {
         console.log('Tailoring CV with job description');
+
+        // Make sure we have the current job for tailoring
+        if (!currentJobForTailoring || !currentJobForTailoring.jobId || !currentJobForTailoring.country) {
+            console.error('Cannot tailor CV: Missing job information');
+            return;
+        }
+
+        const jobId = currentJobForTailoring.jobId;
+        const country = currentJobForTailoring.country;
 
         // Get the tailor button and status elements
         const tailorButton = document.getElementById('tailor-cv-button');
@@ -588,6 +733,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Disable the button and show loading status
         tailorButton.disabled = true;
         tailorStatus.textContent = 'Tailoring CV...';
+
+        // Update the job status to queued
+        updateJobTailoringStatus(jobId, country, 'queued');
 
         // Send the job description to the tailor server
         fetch('http://localhost:5000/tailor', {
@@ -614,7 +762,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.success) {
                 // Update status with success message
-                tailorStatus.textContent = data.message || 'CV tailored successfully!';
+                tailorStatus.textContent = data.message || 'CV tailoring request has been queued';
+
+                // Store the request ID if provided
+                if (data.request_id) {
+                    console.log('Tailor request ID:', data.request_id);
+
+                    // Store the request ID with the job
+                    chrome.storage.local.get(['linkedInJobsByCountry'], (storageData) => {
+                        if (!storageData.linkedInJobsByCountry || !storageData.linkedInJobsByCountry[country]) return;
+
+                        const countryJobs = storageData.linkedInJobsByCountry[country];
+                        const jobIndex = countryJobs.findIndex(job => job.jobId === jobId);
+
+                        if (jobIndex === -1) return;
+
+                        // Update the job with the request ID
+                        countryJobs[jobIndex].tailorRequestId = data.request_id;
+
+                        // Save the updated data
+                        chrome.storage.local.set({
+                            linkedInJobsByCountry: storageData.linkedInJobsByCountry,
+                            linkedInJobs: Object.values(storageData.linkedInJobsByCountry).flat()
+                        });
+                    });
+
+                    // Start polling for status updates
+                    startPollingTailorStatus(jobId, country, data.request_id);
+                }
 
                 // Re-enable the button after a delay
                 setTimeout(() => {
@@ -629,8 +804,78 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error tailoring CV:', error);
             tailorStatus.textContent = `Error: ${error.message}`;
 
+            // Update the job status to failed
+            updateJobTailoringStatus(jobId, country, 'failed');
+
             // Re-enable the button
             tailorButton.disabled = false;
+        });
+    }
+
+    // Function to start polling for tailor status updates
+    function startPollingTailorStatus(jobId, country, requestId) {
+        // Store the interval ID so we can clear it later
+        const intervalId = setInterval(() => {
+            // Check the status of the request
+            fetch(`http://localhost:5000/status/${requestId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Server responded with status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data || !data.status) {
+                        throw new Error('Invalid response from server');
+                    }
+
+                    const status = data.status.status;
+                    console.log(`Tailor status for job ${jobId}, request ${requestId}: ${status}`);
+
+                    // Update the job status
+                    if (status === 'processing') {
+                        updateJobTailoringStatus(jobId, country, 'processing');
+                    } else if (status === 'completed') {
+                        // Get the filename
+                        const filename = data.status.filename || null;
+
+                        // Update the job status to completed
+                        updateJobTailoringStatus(jobId, country, 'completed', filename);
+
+                        // Clear the interval since we're done
+                        clearInterval(intervalId);
+                    } else if (status === 'failed') {
+                        // Update the job status to failed
+                        updateJobTailoringStatus(jobId, country, 'failed');
+
+                        // Clear the interval since we're done
+                        clearInterval(intervalId);
+                    }
+                })
+                .catch(error => {
+                    console.error(`Error checking tailor status for job ${jobId}:`, error);
+
+                    // Don't clear the interval, we'll try again
+                });
+        }, 5000); // Check every 5 seconds
+
+        // Store the interval ID with the job so we can clear it if needed
+        chrome.storage.local.get(['linkedInJobsByCountry'], (data) => {
+            if (!data.linkedInJobsByCountry || !data.linkedInJobsByCountry[country]) return;
+
+            const countryJobs = data.linkedInJobsByCountry[country];
+            const jobIndex = countryJobs.findIndex(job => job.jobId === jobId);
+
+            if (jobIndex === -1) return;
+
+            // We can't store the interval ID directly, but we can store a flag
+            countryJobs[jobIndex].isPollingTailorStatus = true;
+
+            // Save the updated data
+            chrome.storage.local.set({
+                linkedInJobsByCountry: data.linkedInJobsByCountry,
+                linkedInJobs: Object.values(data.linkedInJobsByCountry).flat()
+            });
         });
     }
 
@@ -940,15 +1185,69 @@ document.addEventListener('DOMContentLoaded', () => {
         currentJobForTailoring = job;
 
         // Reset the tailor CV status
-        document.getElementById('tailor-cv-status').textContent = '';
+        const tailorCvStatus = document.getElementById('tailor-cv-status');
+        tailorCvStatus.textContent = '';
+
+        // Update the tailor CV status based on the job's tailoring status
+        if (job.tailoringStatus) {
+            switch (job.tailoringStatus) {
+                case 'queued':
+                    tailorCvStatus.innerHTML = '<i class="fas fa-hourglass-start"></i> CV Queued <button id="reset-cv-status-popup-btn" class="reset-cv-status-popup-btn" title="Reset CV status"><i class="fas fa-times"></i> Reset</button>';
+                    tailorCvStatus.className = 'status-queued';
+                    break;
+                case 'processing':
+                    tailorCvStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> CV Processing <button id="reset-cv-status-popup-btn" class="reset-cv-status-popup-btn" title="Reset CV status"><i class="fas fa-times"></i> Reset</button>';
+                    tailorCvStatus.className = 'status-processing';
+                    break;
+                case 'completed':
+                    tailorCvStatus.innerHTML = `<i class="fas fa-check-circle"></i> CV Ready${job.tailoredCvFilename ? `: ${job.tailoredCvFilename}` : ''} <button id="reset-cv-status-popup-btn" class="reset-cv-status-popup-btn" title="Reset CV status"><i class="fas fa-times"></i> Reset</button>`;
+                    tailorCvStatus.className = 'status-completed';
+                    break;
+                case 'failed':
+                    tailorCvStatus.innerHTML = '<i class="fas fa-exclamation-circle"></i> CV Failed <button id="reset-cv-status-popup-btn" class="reset-cv-status-popup-btn" title="Reset CV status"><i class="fas fa-times"></i> Reset</button>';
+                    tailorCvStatus.className = 'status-failed';
+                    break;
+            }
+
+            // Add event listener for the reset button in the popup
+            const resetButton = document.getElementById('reset-cv-status-popup-btn');
+            if (resetButton) {
+                resetButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+
+                    if (job.jobId && job.country) {
+                        resetJobTailoringStatus(job.jobId, job.country);
+
+                        // Update the current job object
+                        delete job.tailoringStatus;
+                        delete job.tailoredCvFilename;
+
+                        // Update the popup status
+                        tailorCvStatus.innerHTML = '';
+                        tailorCvStatus.className = '';
+
+                        // Re-enable the tailor button if we have a description
+                        if (job.description) {
+                            tailorCvButton.disabled = false;
+                        }
+                    }
+                });
+            }
+        }
 
         // Enable or disable the tailor CV button based on whether we have a job description
+        // and whether a tailoring process is already in progress
         const tailorCvButton = document.getElementById('tailor-cv-button');
-        if (job.description) {
-            tailorCvButton.disabled = false;
-        } else {
+        if (!job.description) {
             tailorCvButton.disabled = true;
-            document.getElementById('tailor-cv-status').textContent = 'No job description available for tailoring';
+            if (!job.tailoringStatus) {
+                tailorCvStatus.textContent = 'No job description available for tailoring';
+            }
+        } else if (job.tailoringStatus === 'queued' || job.tailoringStatus === 'processing') {
+            // Disable the button if tailoring is in progress
+            tailorCvButton.disabled = true;
+        } else {
+            tailorCvButton.disabled = false;
         }
 
         // Show the popup
@@ -1122,6 +1421,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         `<button class="job-applied-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Mark as applied"><i class="fas fa-check"></i></button>`
                     }
                     <button class="job-delete-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Delete this job permanently"><i class="fas fa-trash-alt"></i></button>
+                    ${job.tailoringStatus ?
+                        `<span class="job-tailoring-status ${job.tailoringStatus}">
+                            ${job.tailoringStatus === 'queued' ? '<i class="fas fa-hourglass-start"></i> CV Queued' :
+                              job.tailoringStatus === 'processing' ? '<i class="fas fa-spinner fa-spin"></i> CV Processing' :
+                              job.tailoringStatus === 'completed' ? `<i class="fas fa-check-circle"></i> CV Ready${job.tailoredCvFilename ? `: ${job.tailoredCvFilename}` : ''}` :
+                              job.tailoringStatus === 'failed' ? '<i class="fas fa-exclamation-circle"></i> CV Failed' : ''}
+                            <button class="reset-cv-status-btn" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Reset CV status"><i class="fas fa-times"></i></button>
+                        </span>` : ''
+                    }
                     <span class="job-id">ID: ${job.jobId || 'N/A'}</span>
                 </div>
             `;
@@ -1272,6 +1580,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Even if jobId or country is missing, we'll handle it in deleteSingleJob
                 deleteSingleJob(jobId, country, jobCard);
             });
+
+            // Get the reset CV status button if it exists
+            const resetCvStatusBtn = jobCard.querySelector('.reset-cv-status-btn');
+            if (resetCvStatusBtn) {
+                // Add click event to reset the CV status
+                resetCvStatusBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation(); // Prevent event from bubbling up
+
+                    const jobId = this.getAttribute('data-job-id');
+                    const country = this.getAttribute('data-job-country');
+
+                    if (jobId && country) {
+                        resetJobTailoringStatus(jobId, country);
+                    }
+                });
+            }
 
             // Get the applied button if it exists
             const appliedJobBtn = jobCard.querySelector('.job-applied-button');

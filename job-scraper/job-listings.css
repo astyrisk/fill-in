@@ -542,3 +542,83 @@ button:hover {
     color: #666;
     font-style: italic;
 }
+
+/* Status classes for the popup */
+#tailor-cv-status.status-queued {
+    color: #f39c12;
+}
+
+#tailor-cv-status.status-processing {
+    color: #3498db;
+}
+
+#tailor-cv-status.status-completed {
+    color: #27ae60;
+}
+
+#tailor-cv-status.status-failed {
+    color: #e74c3c;
+}
+
+/* Tailoring status in job card */
+.job-tailoring-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: white;
+    margin-right: 5px;
+}
+
+.job-tailoring-status.queued {
+    background-color: #f39c12;
+}
+
+.job-tailoring-status.processing {
+    background-color: #3498db;
+}
+
+.job-tailoring-status.completed {
+    background-color: #27ae60;
+}
+
+.job-tailoring-status.failed {
+    background-color: #e74c3c;
+}
+
+/* Reset CV status button in job card */
+.reset-cv-status-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0 0 0 5px;
+    margin: 0;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.reset-cv-status-btn:hover {
+    opacity: 1;
+}
+
+/* Reset CV status button in popup */
+.reset-cv-status-popup-btn {
+    background-color: #e74c3c;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 3px 8px;
+    margin-left: 10px;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.reset-cv-status-popup-btn:hover {
+    opacity: 1;
+}
