@@ -19,8 +19,8 @@ chromium-based (Manifest V3) extension to filter related jobs from linked-in and
 - [x] implement PIN, UNPIN
 - [x] applied category for jobs
 - [x] connect it with the python script to tailor the cv
-- [ ] tailor to handle multiple requests at the same time
-- [ ] shows a notification when the resume is done
+- [x] tailor to handle multiple requests at the same time
+- [x] shows a notification when the resume is done
 - [ ] when you click archive, the ui needs to updated correctly
 - [ ] when you archive or apply a job, remove the pin
 - [ ] myworkday support
