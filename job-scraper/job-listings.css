@@ -11,9 +11,34 @@ body {
     padding: 20px;
 }
 
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
 h1 {
     color: #0073b1;
-    margin-bottom: 20px;
+    margin-bottom: 0;
+}
+
+.settings-link {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background-color: #0073b1;
+    color: white;
+    text-decoration: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+}
+
+.settings-link:hover {
+    background-color: #005582;
 }
 
 /* Tab styles */
@@ -61,6 +86,7 @@ h1 {
     margin-bottom: 20px;
     gap: 10px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .filter-options {
@@ -69,6 +95,30 @@ h1 {
     margin-right: 10px;
     align-items: center;
     flex-wrap: wrap;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-left: auto;
+}
+
+.action-button {
+    background-color: #0073b1;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+}
+
+.action-button:hover {
+    background-color: #005582;
 }
 
 .filter-options label {
@@ -214,6 +264,39 @@ button:hover {
 
 .job-card.highlight-effect {
     animation: highlight-pulse 0.5s ease;
+}
+
+/* Loading indicator */
+.loading-indicator {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 30px;
+    font-size: 16px;
+    color: #666;
+    text-align: center;
+}
+
+.loading-indicator::before {
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    margin-right: 10px;
+    border: 3px solid #ddd;
+    border-top-color: #0073b1;
+    border-radius: 50%;
+    animation: spinner 0.8s linear infinite;
+}
+
+@keyframes spinner {
+    to {transform: rotate(360deg);}
+}
+
+/* Virtual scrolling styles */
+.virtual-scroll-spacer {
+    width: 100%;
+    position: relative;
 }
 
 .job-card.pinned {

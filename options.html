@@ -50,11 +50,36 @@
             padding: 20px;
         }
 
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
         h1 {
             color: #0073b1;
-            margin-bottom: 20px;
+            margin-bottom: 0;
             font-size: 24px;
             font-weight: bold;
+        }
+
+        .listings-link {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background-color: #0073b1;
+            color: white;
+            text-decoration: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+
+        .listings-link:hover {
+            background-color: #005582;
         }
 
         #settings-info {
@@ -568,6 +593,28 @@
             background-color: #ddd;
         }
 
+        .secondary-button {
+            background-color: #f1f3f4;
+            color: #333333;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+        }
+
+        .secondary-button i {
+            margin-right: 8px;
+        }
+
+        .secondary-button:hover {
+            background-color: #ddd;
+        }
+
         .add-filter-button {
             margin-top: 20px;
             display: flex;
@@ -720,7 +767,12 @@
 </head>
 <body>
     <div class="container">
-        <h1>Extension Settings</h1>
+        <div class="header-container">
+            <h1>Extension Settings</h1>
+            <a href="job-scraper/job-listings.html" class="listings-link" title="Go to Job Listings">
+                <i class="fas fa-briefcase"></i> Job Listings
+            </a>
+        </div>
         <p id="settings-info">Configure your extension settings</p>
         <div class="tabs">
             <div class="tab active" data-tab="job-scraper">
@@ -734,6 +786,12 @@
             </div>
             <div class="tab" data-tab="tailor-settings">
                 <i class="fas fa-file-alt"></i> Tailor Settings
+            </div>
+            <div class="tab" data-tab="import-export">
+                <i class="fas fa-exchange-alt"></i> Import/Export
+            </div>
+            <div class="tab" data-tab="reset-options">
+                <i class="fas fa-trash-alt"></i> Reset Options
             </div>
         </div>
 
@@ -1050,8 +1108,123 @@
                 <div class="tip">
                     <p><strong><i class="fas fa-info-circle"></i> Note:</strong> The tailor service must be running at http://localhost:5000 for API key testing and CV tailoring to work. Make sure to start the service before testing your API key.</p>
                 </div>
+
+                <h3><i class="fas fa-edit"></i> Tailor Prompt Customization</h3>
+                <div class="tip">
+                    <p><strong><i class="fas fa-lightbulb"></i> Tip:</strong> You can customize the prompt used to tailor your CV. The prompt is sent to the AI model along with your CV and the job description.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="tailor-prompt">Custom Tailor Prompt:</label>
+                    <textarea id="tailor-prompt" rows="10" style="font-family: monospace; font-size: 13px;"></textarea>
+                    <p class="input-help">This prompt instructs the AI how to tailor your CV. Include placeholders: {original_yaml} for your CV and {job_description} for the job details.</p>
+                </div>
+
+                <div class="form-group">
+                    <button id="reset-prompt" class="secondary-button">
+                        <i class="fas fa-undo"></i> Reset to Default Prompt
+                    </button>
+                </div>
             </div>
         </div>
+
+        <!-- Import/Export Tab Content -->
+        <div id="import-export" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-exchange-alt"></i> Import/Export Settings</h2>
+                <p>Export your settings to a file or import settings from a file.</p>
+
+                <div class="tip">
+                    <p><strong><i class="fas fa-lightbulb"></i> Tip:</strong> Use this feature to backup your settings or transfer them to another device.</p>
+                </div>
+
+                <h3><i class="fas fa-download"></i> Export Settings</h3>
+                <p>Export all your settings (personal info, job filters, etc.) to a JSON file.</p>
+                <div class="form-group">
+                    <button id="export-settings" class="button-primary">
+                        <i class="fas fa-download"></i> Export Settings
+                    </button>
+                </div>
+
+                <h3><i class="fas fa-upload"></i> Import Settings</h3>
+                <p>Import settings from a previously exported JSON file.</p>
+                <div class="form-group">
+                    <input type="file" id="import-settings-file" accept=".json" style="display: none;">
+                    <button id="import-settings" class="button-primary">
+                        <i class="fas fa-upload"></i> Import Settings
+                    </button>
+                    <span id="import-settings-status"></span>
+                </div>
+                <div class="tip" style="background-color: #fff3cd; border-left-color: #ffc107;">
+                    <p><strong><i class="fas fa-exclamation-triangle"></i> Warning:</strong> Importing settings will overwrite your current settings.</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-exchange-alt"></i> Import/Export Jobs</h2>
+                <p>Export your scraped jobs to a file or import jobs from a file.</p>
+
+                <div class="tip">
+                    <p><strong><i class="fas fa-lightbulb"></i> Tip:</strong> Use this feature to backup your job listings or transfer them to another device.</p>
+                </div>
+
+                <h3><i class="fas fa-download"></i> Export Jobs</h3>
+                <p>Export all your scraped jobs to a JSON file.</p>
+                <div class="form-group">
+                    <button id="export-jobs" class="button-primary">
+                        <i class="fas fa-download"></i> Export Jobs
+                    </button>
+                </div>
+
+                <h3><i class="fas fa-upload"></i> Import Jobs</h3>
+                <p>Import jobs from a previously exported JSON file.</p>
+                <div class="form-group">
+                    <input type="file" id="import-jobs-file" accept=".json" style="display: none;">
+                    <button id="import-jobs" class="button-primary">
+                        <i class="fas fa-upload"></i> Import Jobs
+                    </button>
+                    <span id="import-jobs-status"></span>
+                </div>
+                <div class="tip" style="background-color: #fff3cd; border-left-color: #ffc107;">
+                    <p><strong><i class="fas fa-exclamation-triangle"></i> Warning:</strong> Importing jobs will merge with your current jobs. Duplicate jobs will be overwritten.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reset Options Tab Content -->
+        <div id="reset-options" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-trash-alt"></i> Reset Options</h2>
+                <p>Reset your settings or remove all jobs. These actions cannot be undone.</p>
+
+                <div class="tip" style="background-color: #fff3cd; border-left-color: #ffc107;">
+                    <p><strong><i class="fas fa-exclamation-triangle"></i> Warning:</strong> These actions will permanently delete your data and cannot be undone. Consider exporting your data first from the Import/Export tab.</p>
+                </div>
+
+                <h3><i class="fas fa-cog"></i> Reset Settings</h3>
+                <p>Reset all your settings to default values. This includes personal information, job filters, and tailor settings.</p>
+                <div class="form-group">
+                    <button id="reset-settings" class="button-secondary" style="background-color: #f8d7da; color: #721c24; border-color: #f5c6cb;">
+                        <i class="fas fa-trash-alt"></i> Reset All Settings
+                    </button>
+                </div>
+
+                <h3><i class="fas fa-briefcase"></i> Remove All Jobs</h3>
+                <p>Remove all scraped jobs from all countries. This will clear your entire job database.</p>
+                <div class="form-group">
+                    <button id="remove-all-jobs" class="button-secondary" style="background-color: #f8d7da; color: #721c24; border-color: #f5c6cb;">
+                        <i class="fas fa-trash-alt"></i> Remove All Jobs
+                    </button>
+                </div>
+
+                <h3><i class="fas fa-bomb"></i> Reset Everything</h3>
+                <p>Reset all settings and remove all jobs. This will completely reset the extension to its initial state.</p>
+                <div class="form-group">
+                    <button id="reset-everything" class="button-secondary" style="background-color: #f8d7da; color: #721c24; border-color: #f5c6cb;">
+                        <i class="fas fa-trash-alt"></i> Reset Everything
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div style="display: flex; justify-content: center; margin-top: 20px; margin-bottom: 30px;">

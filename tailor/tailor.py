@@ -19,6 +19,7 @@ RAW_RESPONSE_PATH = os.path.abspath("raw_response.txt")
 OPENROUTER_API_KEY = config['openrouter_api_key']
 OPENROUTER_API_URL = config['openrouter_api_url']
 OPENROUTER_MODEL = config['model']
+CUSTOM_PROMPT = config.get('custom_prompt', '')
 
 app = Flask(__name__)
 
@@ -48,29 +49,35 @@ def get_job_description(file_path=None):
         return input("Paste the job description here:\n")
 
 # Step 3: Call OpenRouter API with DeepSeek V3 (free tier) to tailor the CV
-def tailor_cv_with_deepseek(_, job_description):  # default_cv parameter not used
+def tailor_cv_with_deepseek(_, job_description, custom_prompt=None):  # default_cv parameter not used
     # Get the original YAML string to show the exact format
     with open(DEFAULT_CV_PATH, 'r') as file:
         original_yaml_str = file.read()
 
-    prompt = (
-        "You are an expert resume writer. I have a default CV in YAML format and a job description. "
-        "Tailor the CV to match the ats important keywords and "
-        "to optimize it for ATS systems. pick the relavant projects (4 projects) and activities. "
-        "Don't add new information. "
-        "Return *only* the tailored CV in YAML format, with no additional text "
-        "or explanations. Ensure all 'highlights' fields are simple strings (e.g., 'GPA: 4.0/5.0'). "
-        "IMPORTANT: You must preserve the exact same order of sections and fields as in the original YAML. "
-        "Do not change the structure or order of the YAML, only modify the content to match the job description. "
-        "You can change the following fields: name, date, label, details, highlights "
-        "In summary, I am a fresh graduate student, So you can start with that . "
-        "Use ** to make text bold as markdown syntax. "
-        "Don't add any new fields. "
-        "Also, add a field called 'filename' at the very top of the YAML with a suggested filename for the CV that includes the job title. "
-        "Here is the exact format of the original YAML:\n\n" + original_yaml_str + "\n\n"
-        "Job Description:\n" + job_description + "\n\n"
-        "Output the tailored CV in YAML format with the exact same structure and order as the original, plus the filename field at the top."
-    )
+    # Use custom prompt if provided, otherwise use default
+    if custom_prompt:
+        # Replace placeholders in the custom prompt
+        prompt = custom_prompt.replace("{original_yaml}", original_yaml_str).replace("{job_description}", job_description)
+    else:
+        # Use the default prompt
+        prompt = (
+            "You are an expert resume writer. I have a default CV in YAML format and a job description. "
+            "Tailor the CV to match the ats important keywords and "
+            "to optimize it for ATS systems. pick the relavant projects (4 projects) and activities. "
+            "Don't add new information. "
+            "Return *only* the tailored CV in YAML format, with no additional text "
+            "or explanations. Ensure all 'highlights' fields are simple strings (e.g., 'GPA: 4.0/5.0'). "
+            "IMPORTANT: You must preserve the exact same order of sections and fields as in the original YAML. "
+            "Do not change the structure or order of the YAML, only modify the content to match the job description. "
+            "You can change the following fields: name, date, label, details, highlights "
+            "In summary, I am a fresh graduate student, So you can start with that . "
+            "Use ** to make text bold as markdown syntax. "
+            "Don't add any new fields. "
+            "Also, add a field called 'filename' at the very top of the YAML with a suggested filename for the CV that includes the job title. "
+            "Here is the exact format of the original YAML:\n\n" + original_yaml_str + "\n\n"
+            "Job Description:\n" + job_description + "\n\n"
+            "Output the tailored CV in YAML format with the exact same structure and order as the original, plus the filename field at the top."
+        )
 
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -262,7 +269,7 @@ def health_check():
 @app.route('/config', methods=['POST'])
 def update_config():
     """Endpoint to update the configuration"""
-    global OPENROUTER_API_KEY, OPENROUTER_API_URL, OPENROUTER_MODEL
+    global OPENROUTER_API_KEY, OPENROUTER_API_URL, OPENROUTER_MODEL, CUSTOM_PROMPT
 
     data = request.json
     if not data:
@@ -278,6 +285,10 @@ def update_config():
     if 'model' in data:
         updated_config['model'] = data['model']
         OPENROUTER_MODEL = data['model']
+
+    if 'custom_prompt' in data:
+        updated_config['custom_prompt'] = data['custom_prompt']
+        CUSTOM_PROMPT = data['custom_prompt']
 
     # Save the updated configuration
     from config import save_config
@@ -505,8 +516,8 @@ def process_queue():
                 request_queue.task_done()
                 continue
 
-            # Tailor the CV
-            tailored_cv = tailor_cv_with_deepseek(default_cv, job_description)
+            # Tailor the CV using custom prompt if available
+            tailored_cv = tailor_cv_with_deepseek(default_cv, job_description, CUSTOM_PROMPT)
             if not tailored_cv:
                 with status_lock:
                     request_status[request_id]['status'] = 'failed'

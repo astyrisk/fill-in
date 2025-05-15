@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fill-In Test Runner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .test-section {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .test-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .test-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button#clear-results {
+            background-color: #f44336;
+        }
+        
+        button#clear-results:hover {
+            background-color: #d32f2f;
+        }
+        
+        .test-group {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .test-result {
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .test-output {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .pass {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .fail {
+            color: #f44336;
+            font-weight: bold;
+        }
+        
+        .test-category {
+            margin-bottom: 30px;
+        }
+        
+        .test-category h2 {
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fill-In Test Runner</h1>
+    
+    <div class="test-section">
+        <div class="test-title">Test Suite</div>
+        <p>This page runs all tests for the Fill-In project.</p>
+        
+        <div class="test-controls">
+            <button id="run-all">Run All Tests</button>
+            <button id="clear-results">Clear Results</button>
+        </div>
+        
+        <div class="test-controls">
+            <button id="run-job-filters">Run Job Filter Tests</button>
+            <button id="run-job-scraper">Run Job Scraper Tests</button>
+            <button id="run-form-filler">Run Form Filler Tests</button>
+        </div>
+    </div>
+    
+    <!-- Job Filter Tests -->
+    <div class="test-category">
+        <h2>Job Filter Tests</h2>
+        
+        <div class="test-group">
+            <h3>Basic Tests</h3>
+            <div id="job-filter-basic-results" class="test-result">
+                <div class="test-output">Click "Run Job Filter Tests" to start...</div>
+            </div>
+        </div>
+        
+        <div class="test-group">
+            <h3>Edge Case Tests</h3>
+            <div id="job-filter-edge-results" class="test-result">
+                <div class="test-output">Click "Run Job Filter Tests" to start...</div>
+            </div>
+        </div>
+        
+        <div class="test-group">
+            <h3>Integration Tests</h3>
+            <div id="job-filter-integration-results" class="test-result">
+                <div class="test-output">Click "Run Job Filter Tests" to start...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Job Scraper Tests -->
+    <div class="test-category">
+        <h2>Job Scraper Tests</h2>
+        
+        <div class="test-group">
+            <h3>Job Title Exclusion</h3>
+            <div id="job-title-exclusion-results" class="test-result">
+                <div class="test-output">Click "Run Job Scraper Tests" to start...</div>
+            </div>
+        </div>
+        
+        <div class="test-group">
+            <h3>Posting Date Conversion</h3>
+            <div id="posting-date-conversion-results" class="test-result">
+                <div class="test-output">Click "Run Job Scraper Tests" to start...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Form Filler Tests -->
+    <div class="test-category">
+        <h2>Form Filler Tests</h2>
+        
+        <div class="test-group">
+            <h3>Form Detection</h3>
+            <div id="form-detection-results" class="test-result">
+                <div class="test-output">No tests available yet.</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Include test scripts -->
+    <script src="job-filters/test-job-filter-basic.js"></script>
+    <script src="job-filters/test-job-filter-edge-cases.js"></script>
+    <script src="job-filters/test-job-filter-integration.js"></script>
+    <script src="job-scraper/test-job-title-exclusion.js"></script>
+    <script src="job-scraper/test-posting-date-conversion.js"></script>
+    
+    <script>
+        // Override console.log to capture output
+        const originalConsoleLog = console.log;
+        const originalConsoleAssert = console.assert;
+        
+        let currentOutputElement = null;
+        
+        function captureConsole(outputElement) {
+            currentOutputElement = outputElement;
+            
+            console.log = function() {
+                const args = Array.from(arguments);
+                const message = args.join(' ');
+                
+                if (currentOutputElement) {
+                    currentOutputElement.innerHTML += message + '\n';
+                    currentOutputElement.scrollTop = currentOutputElement.scrollHeight;
+                }
+                
+                originalConsoleLog.apply(console, arguments);
+            };
+            
+            console.assert = function(condition, ...args) {
+                if (!condition) {
+                    const message = args.join(' ');
+                    
+                    if (currentOutputElement) {
+                        currentOutputElement.innerHTML += 'Assertion failed: ' + message + '\n';
+                        currentOutputElement.scrollTop = currentOutputElement.scrollHeight;
+                    }
+                }
+                
+                originalConsoleAssert.apply(console, arguments);
+            };
+        }
+        
+        function resetConsole() {
+            console.log = originalConsoleLog;
+            console.assert = originalConsoleAssert;
+            currentOutputElement = null;
+        }
+        
+        // Clear all test results
+        function clearResults() {
+            const resultElements = document.querySelectorAll('.test-output');
+            resultElements.forEach(element => {
+                element.innerHTML = 'Tests not run yet...';
+            });
+        }
+        
+        // Run Job Filter Tests
+        function runJobFilterTests() {
+            // Run basic tests
+            const basicOutputElement = document.querySelector('#job-filter-basic-results .test-output');
+            basicOutputElement.innerHTML = '';
+            captureConsole(basicOutputElement);
+            
+            try {
+                if (typeof window.runAllTests === 'function') {
+                    window.runAllTests(); // From test-job-filter-basic.js
+                } else {
+                    console.log('Basic tests not found or not properly loaded.');
+                }
+            } catch (error) {
+                console.log('Error running basic tests:', error);
+            }
+            
+            resetConsole();
+            
+            // Run edge case tests
+            const edgeOutputElement = document.querySelector('#job-filter-edge-results .test-output');
+            edgeOutputElement.innerHTML = '';
+            captureConsole(edgeOutputElement);
+            
+            try {
+                if (typeof window.testCaseInsensitivity === 'function') {
+                    window.runAllTests(); // From test-job-filter-edge-cases.js
+                } else {
+                    console.log('Edge case tests not found or not properly loaded.');
+                }
+            } catch (error) {
+                console.log('Error running edge case tests:', error);
+            }
+            
+            resetConsole();
+            
+            // Run integration tests
+            const integrationOutputElement = document.querySelector('#job-filter-integration-results .test-output');
+            integrationOutputElement.innerHTML = '';
+            captureConsole(integrationOutputElement);
+            
+            try {
+                if (typeof window.testFullWorkflow === 'function') {
+                    window.runAllTests(); // From test-job-filter-integration.js
+                } else {
+                    console.log('Integration tests not found or not properly loaded.');
+                }
+            } catch (error) {
+                console.log('Error running integration tests:', error);
+            }
+            
+            resetConsole();
+        }
+        
+        // Run Job Scraper Tests
+        function runJobScraperTests() {
+            // Run job title exclusion tests
+            const exclusionOutputElement = document.querySelector('#job-title-exclusion-results .test-output');
+            exclusionOutputElement.innerHTML = '';
+            captureConsole(exclusionOutputElement);
+            
+            try {
+                if (typeof window.runAllTests === 'function') {
+                    window.runAllTests(); // From test-job-title-exclusion.js
+                } else {
+                    console.log('Job title exclusion tests not found or not properly loaded.');
+                }
+            } catch (error) {
+                console.log('Error running job title exclusion tests:', error);
+            }
+            
+            resetConsole();
+            
+            // Run posting date conversion tests
+            const dateConversionOutputElement = document.querySelector('#posting-date-conversion-results .test-output');
+            dateConversionOutputElement.innerHTML = '';
+            captureConsole(dateConversionOutputElement);
+            
+            try {
+                // This is a standalone script, so we'll just log a message
+                console.log('Posting date conversion tests need to be run manually.');
+                console.log('Open the browser console and load test-posting-date-conversion.js directly.');
+            } catch (error) {
+                console.log('Error running posting date conversion tests:', error);
+            }
+            
+            resetConsole();
+        }
+        
+        // Run Form Filler Tests
+        function runFormFillerTests() {
+            const formDetectionOutputElement = document.querySelector('#form-detection-results .test-output');
+            formDetectionOutputElement.innerHTML = 'No form filler tests implemented yet.';
+        }
+        
+        // Run all tests
+        function runAllTests() {
+            runJobFilterTests();
+            runJobScraperTests();
+            runFormFillerTests();
+        }
+        
+        // Add event listeners
+        document.getElementById('run-all').addEventListener('click', runAllTests);
+        document.getElementById('run-job-filters').addEventListener('click', runJobFilterTests);
+        document.getElementById('run-job-scraper').addEventListener('click', runJobScraperTests);
+        document.getElementById('run-form-filler').addEventListener('click', runFormFillerTests);
+        document.getElementById('clear-results').addEventListener('click', clearResults);
+    </script>
+</body>
+</html>

@@ -9,7 +9,12 @@
 </head>
 <body>
     <div class="container">
-        <h1>LinkedIn Job Listings</h1>
+        <div class="header-container">
+            <h1>LinkedIn Job Listings</h1>
+            <a href="../options.html" class="settings-link" title="Go to Settings">
+                <i class="fas fa-cog"></i> Settings
+            </a>
+        </div>
         <p id="scrape-info">Loading job listings...</p>
 
         <div class="tabs">
@@ -35,7 +40,9 @@
                         </select>
                     </div>
                 </div>
-                <button id="delete-shown-jobs-button" class="delete-button">Delete Shown Jobs</button>
+                <div class="action-buttons">
+                    <button id="delete-shown-jobs-button" class="delete-button">Delete Shown Jobs</button>
+                </div>
             </div>
 
             <div id="job-listings-container">
@@ -104,6 +111,7 @@
             <button class="cancel-button" id="cancel-delete">Cancel</button>
         </div>
     </div>
+
 
     <script src="../shared/utils.js"></script>
     <script src="job-listings.js"></script>

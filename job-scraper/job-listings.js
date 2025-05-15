@@ -38,6 +38,9 @@ function updateJobTailoringStatus(jobId, country, status, filename = null) {
         }, () => {
             console.log(`Updated tailoring status for job ${jobId} to ${status || 'reset'}`);
 
+            // Clear the cache since we've modified job data
+            jobCache.clear();
+
             // Update the UI for this job if it's currently displayed
             updateTailoringStatusUI(jobId, status, filename);
         });
@@ -134,6 +137,188 @@ function updateTailoringStatusUI(jobId, status, filename = null) {
 // We no longer need to listen for messages from the background script
 // since we're handling tailoring status directly in the job objects
 
+// Cache for storing filtered job results
+const jobCache = {
+    // Structure: { countryName: { tabId: { searchTerm: { jobs: [...], timestamp: Date } } } }
+    data: {},
+
+    // Maximum age of cache entries in milliseconds (5 seconds)
+    maxAge: 5000,
+
+    // Store jobs in cache
+    set: function(country, tabId, searchTerm, jobs) {
+        if (!this.data[country]) {
+            this.data[country] = {};
+        }
+        if (!this.data[country][tabId]) {
+            this.data[country][tabId] = {};
+        }
+        this.data[country][tabId][searchTerm] = {
+            jobs: jobs,
+            timestamp: Date.now()
+        };
+    },
+
+    // Get jobs from cache if available and not expired
+    get: function(country, tabId, searchTerm) {
+        if (!this.data[country] ||
+            !this.data[country][tabId] ||
+            !this.data[country][tabId][searchTerm]) {
+            return null;
+        }
+
+        const entry = this.data[country][tabId][searchTerm];
+        if (Date.now() - entry.timestamp > this.maxAge) {
+            // Cache entry is too old, remove it
+            delete this.data[country][tabId][searchTerm];
+            return null;
+        }
+
+        return entry.jobs;
+    },
+
+    // Clear cache for a specific country/tab/search or all if not specified
+    clear: function(country, tabId, searchTerm) {
+        if (country && tabId && searchTerm) {
+            if (this.data[country] &&
+                this.data[country][tabId] &&
+                this.data[country][tabId][searchTerm]) {
+                delete this.data[country][tabId][searchTerm];
+            }
+        } else if (country && tabId) {
+            if (this.data[country] && this.data[country][tabId]) {
+                this.data[country][tabId] = {};
+            }
+        } else if (country) {
+            if (this.data[country]) {
+                this.data[country] = {};
+            }
+        } else {
+            this.data = {};
+        }
+    }
+};
+
+// Virtual scrolling implementation
+class VirtualScroller {
+    constructor(container, options = {}) {
+        this.container = container;
+        this.items = [];
+        this.visibleItems = [];
+        this.itemHeight = options.itemHeight || 100; // Estimated height of each item
+        this.buffer = options.buffer || 5; // Number of items to render above/below viewport
+        this.renderItem = options.renderItem || (item => item);
+
+        this.scrollContainer = options.scrollContainer || window;
+        this.lastScrollTop = 0;
+        this.ticking = false;
+
+        this.setupContainer();
+        this.bindEvents();
+    }
+
+    setupContainer() {
+        // Make sure container has position relative or absolute for absolute positioning of items
+        const containerStyle = window.getComputedStyle(this.container);
+        if (containerStyle.position === 'static') {
+            this.container.style.position = 'relative';
+        }
+
+        // Create a spacer element to maintain scroll height
+        this.spacer = document.createElement('div');
+        this.spacer.className = 'virtual-scroll-spacer';
+        this.container.appendChild(this.spacer);
+    }
+
+    bindEvents() {
+        this.scrollContainer.addEventListener('scroll', () => this.onScroll(), { passive: true });
+        window.addEventListener('resize', () => this.onResize(), { passive: true });
+    }
+
+    onScroll() {
+        if (!this.ticking) {
+            window.requestAnimationFrame(() => {
+                this.updateVisibleItems();
+                this.ticking = false;
+            });
+            this.ticking = true;
+        }
+    }
+
+    onResize() {
+        if (!this.ticking) {
+            window.requestAnimationFrame(() => {
+                this.updateVisibleItems();
+                this.ticking = false;
+            });
+            this.ticking = true;
+        }
+    }
+
+    setItems(items) {
+        this.items = items;
+        this.updateSpacerHeight();
+        this.updateVisibleItems();
+    }
+
+    updateSpacerHeight() {
+        this.spacer.style.height = `${this.items.length * this.itemHeight}px`;
+    }
+
+    getVisibleRange() {
+        const scrollTop = this.scrollContainer === window
+            ? window.scrollY
+            : this.scrollContainer.scrollTop;
+
+        const viewportHeight = this.scrollContainer === window
+            ? window.innerHeight
+            : this.scrollContainer.clientHeight;
+
+        const containerTop = this.container.getBoundingClientRect().top +
+            (this.scrollContainer === window ? 0 : this.scrollContainer.scrollTop);
+
+        const relativeScrollTop = Math.max(0, scrollTop - containerTop);
+
+        const startIndex = Math.max(0, Math.floor(relativeScrollTop / this.itemHeight) - this.buffer);
+        const endIndex = Math.min(
+            this.items.length - 1,
+            Math.ceil((relativeScrollTop + viewportHeight) / this.itemHeight) + this.buffer
+        );
+
+        return { startIndex, endIndex };
+    }
+
+    updateVisibleItems() {
+        if (this.items.length === 0) return;
+
+        const { startIndex, endIndex } = this.getVisibleRange();
+        const visibleItems = this.items.slice(startIndex, endIndex + 1);
+
+        // Clear container except for spacer
+        const children = Array.from(this.container.children);
+        children.forEach(child => {
+            if (child !== this.spacer && !child.classList.contains('date-category-section')) {
+                this.container.removeChild(child);
+            }
+        });
+
+        // Render visible items
+        visibleItems.forEach((item, index) => {
+            const absoluteIndex = startIndex + index;
+            const element = this.renderItem(item, absoluteIndex);
+
+            if (element) {
+                element.style.position = 'absolute';
+                element.style.top = `${absoluteIndex * this.itemHeight}px`;
+                element.style.width = '100%';
+                this.container.appendChild(element);
+            }
+        });
+
+        this.visibleItems = visibleItems;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const jobListingsContainer = document.getElementById('job-listings-container');
     const scrapeInfo = document.getElementById('scrape-info');
@@ -141,9 +326,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Refresh button removed
     const deleteShownJobsButton = document.getElementById('delete-shown-jobs-button');
     const countrySelect = document.getElementById('country-select');
-
-    // Tab elements
-    const tabs = document.querySelectorAll('.tab');
 
     // Popup elements
     const popupOverlay = document.getElementById('popup-overlay');
@@ -178,29 +360,43 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Debounce function for search input
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+
     // Load job listings from storage
     loadJobListings();
 
-    // Add event listeners
-    searchInput.addEventListener('input', filterJobListings);
+    // Add event listeners with debounce for search
+    searchInput.addEventListener('input', debounce(filterJobListings, 300));
 
-    // Setup tab navigation
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            // Remove active class from all tabs
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    // Setup tab navigation with event delegation
+    document.querySelector('.tabs').addEventListener('click', (e) => {
+        const tab = e.target.closest('.tab');
+        if (!tab) return;
 
-            // Add active class to clicked tab
-            tab.classList.add('active');
+        // Remove active class from all tabs
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
 
-            // Filter job listings based on the active tab
-            filterJobListings();
-        });
+        // Add active class to clicked tab
+        tab.classList.add('active');
+
+        // Filter job listings based on the active tab
+        filterJobListings();
     });
 
     // Add event listener for country filter
     if (countrySelect) {
-        countrySelect.addEventListener('change', filterJobListings);
+        countrySelect.addEventListener('change', () => {
+            // Clear cache when country changes
+            jobCache.clear();
+            filterJobListings();
+        });
 
         // Populate country dropdown
         populateCountryDropdown();
@@ -211,13 +407,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 100);
     }
 
+    // Import/export buttons removed
+
     // Refresh button event listener removed
 
     // Function to get filtered jobs based on current filters
     function getFilteredJobs(callback) {
+        const searchTerm = searchInput.value.toLowerCase();
+        const selectedCountry = countrySelect.value;
+
+        // Get the active tab
+        const activeTab = document.querySelector('.tab.active');
+        const activeTabId = activeTab ? activeTab.getAttribute('data-tab') : 'unapplied-jobs';
+
+        // Check if we have cached results for this combination
+        const cachedJobs = jobCache.get(selectedCountry, activeTabId, searchTerm);
+        if (cachedJobs) {
+            console.log('Using cached job results');
+            callback(cachedJobs);
+            return;
+        }
+
+        console.log('Fetching fresh job data');
         chrome.storage.local.get(['linkedInJobs', 'linkedInJobsByCountry'], (data) => {
-            const searchTerm = searchInput.value.toLowerCase();
-            const selectedCountry = countrySelect.value;
             let allJobs = [];
 
             if (data.linkedInJobsByCountry && Object.keys(data.linkedInJobsByCountry).length > 0) {
@@ -250,14 +462,21 @@ document.addEventListener('DOMContentLoaded', () => {
                        (job.jobId && job.jobId.toLowerCase().includes(searchTerm));
             });
 
-            // By default, show only non-applied jobs
-            // If "Show Applied Jobs" is checked, include all jobs
-            const showAppliedJobs = document.getElementById('filter-applied')?.checked;
-            const appliedFilteredJobs = showAppliedJobs ?
-                filteredJobs :
-                filteredJobs.filter(job => !job.isApplied);
+            // Apply tab-specific filtering
+            let tabFilteredJobs = filteredJobs;
 
-            callback(appliedFilteredJobs);
+            if (activeTabId === 'unapplied-jobs') {
+                // Show only non-applied jobs
+                tabFilteredJobs = filteredJobs.filter(job => !job.isApplied);
+            } else if (activeTabId === 'applied-jobs') {
+                // Show only applied jobs
+                tabFilteredJobs = filteredJobs.filter(job => job.isApplied);
+            }
+
+            // Store the results in cache
+            jobCache.set(selectedCountry, activeTabId, searchTerm, tabFilteredJobs);
+
+            callback(tabFilteredJobs);
         });
     }
 
@@ -473,7 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Function to archive a single job (move to Archive country)
-    function archiveSingleJob(jobId, country, jobElement) { // jobElement is kept for API compatibility
+    function archiveSingleJob(jobId, country, _jobElement) { // Parameter kept for API compatibility but not used
         // Don't archive if the job is already in Archive
         if (country === 'Archive') {
             alert('This job is already archived');
@@ -543,6 +762,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 countries: Object.keys(data.linkedInJobsByCountry)
             }, () => {
                 console.log(`Archived job ${jobId} from ${country} to Archive with reset details`);
+
+                // Clear the cache since we've modified job data
+                jobCache.clear();
 
                 // Instead of just removing the job element, refresh the job listings
                 // to ensure the UI is properly updated
@@ -677,8 +899,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }, () => {
                 console.log(`Permanently deleted ${jobsToDelete.length} jobs`);
 
+                // Clear the cache since we've modified job data
+                jobCache.clear();
+
                 // Refresh the job listings display
-                renderJobListings(updatedAllJobs);
+                renderJobListingsOptimized(updatedAllJobs);
 
                 // Update the job count in the UI
                 updateJobCountDisplay(updatedAllJobs.length);
@@ -690,7 +915,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Function to update the job count display
-    function updateJobCountDisplay(totalJobCount) { // totalJobCount parameter kept for API compatibility
+    function updateJobCountDisplay() {
         // Instead of updating the count directly, call filterJobListings to ensure consistent display
         filterJobListings();
     }
@@ -793,30 +1018,37 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update the job status to queued
         updateJobTailoringStatus(jobId, country, 'queued');
 
-        // First, check if we have a custom API key configured
-        chrome.storage.sync.get({ tailorSettings: { openrouterApiKey: '' } }, (data) => {
+        // First, check if we have custom settings configured
+        chrome.storage.sync.get({
+            tailorSettings: {
+                openrouterApiKey: '',
+                tailorPrompt: ''
+            }
+        }, (data) => {
             const apiKey = data.tailorSettings?.openrouterApiKey || '';
+            const customPrompt = data.tailorSettings?.tailorPrompt || '';
 
-            // If we have an API key, update the server configuration first
-            const updateConfigPromise = apiKey ?
+            // If we have custom settings, update the server configuration first
+            const updateConfigPromise = (apiKey || customPrompt) ?
                 fetch('http://localhost:5000/config', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        openrouter_api_key: apiKey
+                        openrouter_api_key: apiKey,
+                        custom_prompt: customPrompt
                     })
                 }).then(response => {
                     if (!response.ok) {
-                        console.warn('Failed to update tailor service API key, using default key');
+                        console.warn('Failed to update tailor service settings, using default settings');
                     }
                     return Promise.resolve(); // Continue regardless of success
                 }).catch(error => {
-                    console.warn('Error updating tailor service API key:', error);
+                    console.warn('Error updating tailor service settings:', error);
                     return Promise.resolve(); // Continue regardless of error
                 })
-                : Promise.resolve(); // No API key, just continue
+                : Promise.resolve(); // No custom settings, just continue
 
             // After updating the config (or immediately if no API key), send the job description
             updateConfigPromise
@@ -1423,6 +1655,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 linkedInJobs: Object.values(data.linkedInJobsByCountry).flat() // Update flat list for backward compatibility
             }, () => {
                 console.log(`Updated job ${jobId} with additional details`);
+
+                // Clear the cache since we've modified job data
+                jobCache.clear();
             });
         });
     }
@@ -1599,391 +1834,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return { sectionDiv, contentDiv };
     }
 
-    function renderJobListings(jobs) {
-        jobListingsContainer.innerHTML = '';
-
-        if (!jobs || jobs.length === 0) {
-            jobListingsContainer.innerHTML = '<p>No job listings match your current filters.</p>';
-            return;
-        }
-
-        // Categorize jobs by date
-        const categorizedJobs = categorizeJobsByDate(jobs);
-
-        // Create sections for each category
-        const pinnedSection = createDateCategorySection('pinned', categorizedJobs.pinned);
-        const past24HoursSection = createDateCategorySection('past24Hours', categorizedJobs.past24Hours);
-        const pastWeekSection = createDateCategorySection('pastWeek', categorizedJobs.pastWeek);
-        const pastMonthSection = createDateCategorySection('pastMonth', categorizedJobs.pastMonth, true); // Collapsed by default
-        const olderSection = createDateCategorySection('older', categorizedJobs.older, true); // Collapsed by default
-
-        // Add sections to the container if they have jobs
-        if (pinnedSection && categorizedJobs.pinned.length > 0) {
-            jobListingsContainer.appendChild(pinnedSection.sectionDiv);
-        }
-
-        if (past24HoursSection && categorizedJobs.past24Hours.length > 0) {
-            jobListingsContainer.appendChild(past24HoursSection.sectionDiv);
-        }
-
-        if (pastWeekSection && categorizedJobs.pastWeek.length > 0) {
-            jobListingsContainer.appendChild(pastWeekSection.sectionDiv);
-        }
-
-        if (pastMonthSection && categorizedJobs.pastMonth.length > 0) {
-            jobListingsContainer.appendChild(pastMonthSection.sectionDiv);
-        }
-
-        if (olderSection && categorizedJobs.older.length > 0) {
-            jobListingsContainer.appendChild(olderSection.sectionDiv);
-        }
-
-        // Render jobs for each category
-        if (pinnedSection && categorizedJobs.pinned.length > 0) {
-            renderJobsInSection(categorizedJobs.pinned, pinnedSection.contentDiv);
-        }
-
-        if (past24HoursSection && categorizedJobs.past24Hours.length > 0) {
-            renderJobsInSection(categorizedJobs.past24Hours, past24HoursSection.contentDiv);
-        }
-
-        if (pastWeekSection && categorizedJobs.pastWeek.length > 0) {
-            renderJobsInSection(categorizedJobs.pastWeek, pastWeekSection.contentDiv);
-        }
-
-        if (pastMonthSection && categorizedJobs.pastMonth.length > 0) {
-            renderJobsInSection(categorizedJobs.pastMonth, pastMonthSection.contentDiv);
-        }
-
-        if (olderSection && categorizedJobs.older.length > 0) {
-            renderJobsInSection(categorizedJobs.older, olderSection.contentDiv);
-        }
-    }
-
-    // Function to render jobs in a section
-    function renderJobsInSection(jobs, container) {
-        if (!container || !jobs || jobs.length === 0) return;
-
-        jobs.forEach(job => {
-            const jobCard = document.createElement('div');
-            jobCard.className = job.isPinned ? 'job-card pinned' : 'job-card';
-
-            // Create badges for Easy Apply, Promoted, Pinned, and Applied
-            const badges = [];
-            if (job.isPinned) {
-                badges.push('<span class="job-badge pinned">Pinned</span>');
-            }
-            if (job.isEasyApply) {
-                badges.push('<span class="job-badge easy-apply">Easy Apply</span>');
-            }
-            if (job.isPromoted) {
-                badges.push('<span class="job-badge promoted">Promoted</span>');
-            }
-            if (job.isApplied) {
-                badges.push('<span class="job-badge applied">Applied</span>');
-            }
-
-            // Add country badge if available
-            if (job.country && job.country !== 'Unknown') {
-                badges.push(`<span class="job-badge country">${job.country}</span>`);
-            }
-
-            // Format application insight if available
-            const insightHtml = job.applicationInsight ?
-                `<div class="job-insight">${job.applicationInsight}</div>` : '';
-
-            // Add details badge if we have scraped additional details
-            if (job.detailsScraped) {
-                badges.push('<span class="job-badge details">Details Available</span>');
-            }
-
-            // Format posting date if available
-            let postingDateHtml = '';
-            if (job.convertedDate && job.convertedDate.formattedDate) {
-                postingDateHtml = `<div class="job-posting-date">Posted: ${job.convertedDate.formattedDate}</div>`;
-            } else if (job.postingDate) {
-                postingDateHtml = `<div class="job-posting-date">Posted: ${job.postingDate}</div>`;
-            }
-
-            jobCard.innerHTML = `
-                <div class="job-header">
-                    <div class="job-title">${job.title}</div>
-                    <div class="job-badges">${badges.join('')}</div>
-                </div>
-                <div class="job-company">${job.company}</div>
-                <div class="job-location">${job.location}</div>
-                ${postingDateHtml}
-                ${insightHtml}
-                ${job.isPinned ?
-                    `<button class="job-pin-button job-pin-corner job-unpin-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Unpin this job"><i class="fas fa-thumbtack fa-rotate-90"></i></button>` :
-                    `<button class="job-pin-button job-pin-corner" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Pin this job to top"><i class="fas fa-thumbtack"></i></button>`
-                }
-                <div class="job-actions">
-                    <a href="javascript:void(0)" class="apply-button view-job-btn" data-job-id="${job.jobId || ''}" data-job-url="${job.jobUrl}" data-job-country="${job.country || ''}" title="View job details"><i class="fas fa-eye"></i> View</a>
-                    <a href="${job.jobUrl || (job.jobId ? `https://www.linkedin.com/jobs/view/${job.jobId}/` : '#')}" target="_blank" class="apply-button linkedin-btn" title="Open LinkedIn job page"><i class="fab fa-linkedin"></i> LinkedIn</a>
-                    ${job.country === 'Archive' ?
-                        `<button class="job-unarchive-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" data-original-country="${job.originalCountry || 'Unknown'}" title="Unarchive this job"><i class="fas fa-box-open"></i></button>` :
-                        `<button class="job-archive-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Archive this job"><i class="fas fa-archive"></i></button>`
-                    }
-                    ${job.isApplied ?
-                        `<button class="job-unapplied-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Mark as not applied"><i class="fas fa-check-circle"></i></button>` :
-                        `<button class="job-applied-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Mark as applied"><i class="fas fa-check"></i></button>`
-                    }
-                    <button class="job-delete-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Delete this job permanently"><i class="fas fa-trash-alt"></i></button>
-                    ${job.tailoringStatus ?
-                        `<span class="job-tailoring-status ${job.tailoringStatus}">
-                            ${job.tailoringStatus === 'queued' ? '<i class="fas fa-hourglass-start"></i> CV Queued' :
-                              job.tailoringStatus === 'processing' ? '<i class="fas fa-spinner fa-spin"></i> CV Processing' :
-                              job.tailoringStatus === 'completed' ? `<i class="fas fa-check-circle"></i> CV Ready${job.tailoredCvFilename ? `: ${job.tailoredCvFilename}` : ''}` :
-                              job.tailoringStatus === 'failed' ? '<i class="fas fa-exclamation-circle"></i> CV Failed' : ''}
-                            <button class="reset-cv-status-btn" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Reset CV status"><i class="fas fa-times"></i></button>
-                        </span>` : ''
-                    }
-                    <span class="job-id">ID: ${job.jobId || 'N/A'}</span>
-                </div>
-            `;
-
-            container.appendChild(jobCard);
-
-            // Get the View Job button we just added
-            const viewJobBtn = jobCard.querySelector('.view-job-btn');
-
-            // Add hover event to scrape job details
-            viewJobBtn.addEventListener('mouseenter', function() {
-                const jobId = this.getAttribute('data-job-id');
-                const jobUrl = this.getAttribute('data-job-url');
-                const country = this.getAttribute('data-job-country');
-
-                // Only scrape if we haven't already, we're not currently scraping, and the job is not archived
-                if (!job.detailsScraped && !job.isScrapingDetails && jobId && jobUrl && job.country !== 'Archive') {
-                    // Mark that we're starting to scrape
-                    job.isScrapingDetails = true;
-
-                    // Show loading indicator
-                    this.classList.add('loading');
-                    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
-
-                    console.log(`Hovering over job ${jobId}, scraping details...`);
-
-                    // Scrape job details
-                    scrapeJobDetails(jobUrl, jobId, country).then(jobDetails => {
-                        // Remove loading indicator
-                        this.classList.remove('loading');
-                        this.innerHTML = '<i class="fas fa-eye"></i> View';
-
-                        // Reset scraping flag
-                        job.isScrapingDetails = false;
-
-                        if (jobDetails) {
-                            console.log('Job listings - received job details:', jobDetails);
-                            console.log('Job listings - isEasyApply from jobDetails:', jobDetails.isEasyApply);
-
-                            // Update the job with the scraped details
-                            updateJobWithDetails(jobId, country, jobDetails);
-
-                            // Update the current job object for immediate use
-                            Object.assign(job, jobDetails, { detailsScraped: true });
-                            console.log('Job listings - job after update:', job);
-
-                            // Add the details badge to the job card
-                            const jobCard = this.closest('.job-card');
-                            const badgesContainer = jobCard.querySelector('.job-badges');
-
-                            // Add Details Available badge if not already present
-                            if (badgesContainer && !jobCard.querySelector('.job-badge.details')) {
-                                const detailsBadge = document.createElement('span');
-                                detailsBadge.className = 'job-badge details';
-                                detailsBadge.textContent = 'Details Available';
-                                badgesContainer.appendChild(detailsBadge);
-                            }
-
-                            // Add Easy Apply badge if the job is detected as Easy Apply and badge not already present
-                            console.log('Checking if Easy Apply badge should be added:',
-                                'jobDetails =', jobDetails,
-                                'jobDetails.isEasyApply =', jobDetails.isEasyApply,
-                                'badgesContainer exists =', !!badgesContainer,
-                                'badge already exists =', !!jobCard.querySelector('.job-badge.easy-apply'));
-
-                            if (jobDetails.isEasyApply === true && badgesContainer && !jobCard.querySelector('.job-badge.easy-apply')) {
-                                console.log('Adding Easy Apply badge to job card');
-                                const easyApplyBadge = document.createElement('span');
-                                easyApplyBadge.className = 'job-badge easy-apply';
-                                easyApplyBadge.textContent = 'Easy Apply';
-                                badgesContainer.appendChild(easyApplyBadge);
-
-                                // Also update the job object's isEasyApply property
-                                job.isEasyApply = true;
-                                console.log('Updated job.isEasyApply to true');
-                            } else {
-                                console.log('Not adding Easy Apply badge. Conditions not met.');
-                            }
-                        }
-                    }).catch(error => {
-                        console.error(`Error scraping details for job ${jobId}:`, error);
-
-                        // Remove loading indicator
-                        this.classList.remove('loading');
-                        this.innerHTML = '<i class="fas fa-eye"></i> View';
-
-                        // Reset scraping flag
-                        job.isScrapingDetails = false;
-                    });
-                }
-            });
-
-            // Add click event to show popup with job details
-            viewJobBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                openJobDetailsPopup(job);
-            });
-
-            // Get the archive button if it exists
-            const archiveJobBtn = jobCard.querySelector('.job-archive-button');
-            if (archiveJobBtn) {
-                // Add click event to archive the job
-                archiveJobBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const jobId = this.getAttribute('data-job-id');
-                    const country = this.getAttribute('data-job-country');
-
-                    if (!jobId || !country) {
-                        alert('Cannot archive job: Need both job ID and country to archive');
-                        return;
-                    }
-
-                    // Archive the job immediately without confirmation
-                    archiveSingleJob(jobId, country, jobCard);
-                });
-            }
-
-            // Get the unarchive button if it exists
-            const unarchiveJobBtn = jobCard.querySelector('.job-unarchive-button');
-            if (unarchiveJobBtn) {
-                // Add click event to unarchive the job
-                unarchiveJobBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const jobId = this.getAttribute('data-job-id');
-                    const country = this.getAttribute('data-job-country');
-                    const originalCountry = this.getAttribute('data-original-country');
-
-                    if (!jobId || country !== 'Archive') {
-                        alert('Cannot unarchive job: Invalid job ID or job is not archived');
-                        return;
-                    }
-
-                    // Unarchive the job immediately without confirmation
-                    unarchiveSingleJob(jobId, originalCountry, jobCard);
-                });
-            }
-
-            // Get the delete button we just added
-            const deleteJobBtn = jobCard.querySelector('.job-delete-button');
-
-            // Add click event to delete the job
-            deleteJobBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                const jobId = this.getAttribute('data-job-id');
-                const country = this.getAttribute('data-job-country');
-
-                // Delete the job immediately without confirmation
-                // Even if jobId or country is missing, we'll handle it in deleteSingleJob
-                deleteSingleJob(jobId, country, jobCard);
-            });
-
-            // Get the reset CV status button if it exists
-            const resetCvStatusBtn = jobCard.querySelector('.reset-cv-status-btn');
-            if (resetCvStatusBtn) {
-                // Add click event to reset the CV status
-                resetCvStatusBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation(); // Prevent event from bubbling up
-
-                    const jobId = this.getAttribute('data-job-id');
-                    const country = this.getAttribute('data-job-country');
-
-                    if (jobId && country) {
-                        resetJobTailoringStatus(jobId, country);
-                    }
-                });
-            }
-
-            // Get the applied button if it exists
-            const appliedJobBtn = jobCard.querySelector('.job-applied-button');
-            if (appliedJobBtn) {
-                // Add click event to mark the job as applied
-                appliedJobBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const jobId = this.getAttribute('data-job-id');
-                    const country = this.getAttribute('data-job-country');
-
-                    if (!jobId || !country) {
-                        alert('Cannot mark job as applied: Need both job ID and country');
-                        return;
-                    }
-
-                    // Mark the job as applied
-                    markJobAsApplied(jobId, country, jobCard);
-                });
-            }
-
-            // Get the unapplied button if it exists
-            const unappliedJobBtn = jobCard.querySelector('.job-unapplied-button');
-            if (unappliedJobBtn) {
-                // Add click event to mark the job as not applied
-                unappliedJobBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const jobId = this.getAttribute('data-job-id');
-                    const country = this.getAttribute('data-job-country');
-
-                    if (!jobId || !country) {
-                        alert('Cannot mark job as not applied: Need both job ID and country');
-                        return;
-                    }
-
-                    // Mark the job as not applied
-                    markJobAsUnapplied(jobId, country, jobCard);
-                });
-            }
-
-            // Get the pin button (either in corner or in actions)
-            const pinJobBtn = jobCard.querySelector('.job-pin-button');
-            if (pinJobBtn) {
-                // Add click event to pin the job
-                pinJobBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const jobId = this.getAttribute('data-job-id');
-                    const country = this.getAttribute('data-job-country');
-
-                    if (!jobId || !country) {
-                        alert('Cannot pin job: Need both job ID and country');
-                        return;
-                    }
-
-                    // Pin the job
-                    pinJob(jobId, country);
-                });
-            }
-
-            // Get the unpin button (either in corner or in actions)
-            const unpinJobBtn = jobCard.querySelector('.job-unpin-button');
-            if (unpinJobBtn) {
-                // Add click event to unpin the job
-                unpinJobBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const jobId = this.getAttribute('data-job-id');
-                    const country = this.getAttribute('data-job-country');
-
-                    if (!jobId || !country) {
-                        alert('Cannot unpin job: Need both job ID and country');
-                        return;
-                    }
-
-                    // Unpin the job
-                    unpinJob(jobId, country);
-                });
-            }
-        });
-    }
+    // Legacy functions have been replaced by optimized versions in renderJobListingsOptimized
 
     // Function to pin a job
     function pinJob(jobId, country) {
@@ -2007,6 +1858,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 linkedInJobs: Object.values(data.linkedInJobsByCountry).flat() // Update flat list for backward compatibility
             }, () => {
                 console.log(`Pinned job ${jobId}`);
+
+                // Clear the cache since we've modified job data
+                jobCache.clear();
 
                 // Refresh the job listings to show the pinned job at the top
                 filterJobListings();
@@ -2037,6 +1891,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }, () => {
                 console.log(`Unpinned job ${jobId}`);
 
+                // Clear the cache since we've modified job data
+                jobCache.clear();
+
                 // Refresh the job listings
                 filterJobListings();
             });
@@ -2065,6 +1922,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 linkedInJobs: Object.values(data.linkedInJobsByCountry).flat() // Update flat list for backward compatibility
             }, () => {
                 console.log(`Marked job ${jobId} as applied`);
+
+                // Clear the cache since we've modified job data
+                jobCache.clear();
 
                 // Check if we should show applied jobs
                 const showAppliedJobs = document.getElementById('filter-applied')?.checked;
@@ -2151,6 +2011,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }, () => {
                 console.log(`Marked job ${jobId} as not applied`);
 
+                // Clear the cache since we've modified job data
+                jobCache.clear();
+
                 // If we have a job element, update it without refreshing the whole list
                 if (jobElement) {
                     // Add a visual highlight effect to indicate the job is now unapplied
@@ -2194,6 +2057,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Virtual scroller is implemented through our optimized rendering
+
     function filterJobListings() {
         const searchTerm = searchInput.value.toLowerCase();
         const selectedCountry = countrySelect.value;
@@ -2202,101 +2067,376 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeTab = document.querySelector('.tab.active');
         const activeTabId = activeTab ? activeTab.getAttribute('data-tab') : 'unapplied-jobs';
 
-        chrome.storage.local.get(['linkedInJobs', 'linkedInJobsByCountry'], (data) => {
-            // Use the new format if available, otherwise fall back to the old format
-            let allJobs = [];
-            let totalJobCount = 0;
+        // Show loading indicator
+        jobListingsContainer.innerHTML = '<div class="loading-indicator">Loading jobs...</div>';
 
-            if (data.linkedInJobsByCountry && Object.keys(data.linkedInJobsByCountry).length > 0) {
-                // Handle Archive tab separately
-                if (activeTabId === 'archive-jobs') {
-                    // For Archive tab, only show jobs from Archive country
-                    allJobs = data.linkedInJobsByCountry['Archive'] || [];
-                    totalJobCount = allJobs.length;
-                } else {
-                    // For other tabs, filter by the selected country (excluding Archive)
-                    if (selectedCountry && selectedCountry !== 'Archive') {
-                        allJobs = data.linkedInJobsByCountry[selectedCountry] || [];
-                    } else if (countrySelect.options.length > 0) {
-                        // If no country is selected but options exist, use the first one that's not Archive
-                        const firstCountry = Array.from(countrySelect.options)
-                            .find(option => option.value !== 'Archive')?.value;
+        // Use our optimized getFilteredJobs function that uses caching
+        getFilteredJobs((tabFilteredJobs) => {
+            // Get total job count for status display
+            chrome.storage.local.get(['linkedInJobsByCountry'], (data) => {
+                let totalJobCount = 0;
 
-                        if (firstCountry) {
-                            allJobs = data.linkedInJobsByCountry[firstCountry] || [];
-
-                            // Update the selected country in the dropdown
-                            countrySelect.value = firstCountry;
-                            selectedCountry = firstCountry;
+                if (data.linkedInJobsByCountry && Object.keys(data.linkedInJobsByCountry).length > 0) {
+                    // Calculate total job count across all countries (excluding Archive unless it's selected)
+                    Object.entries(data.linkedInJobsByCountry).forEach(([country, countryJobs]) => {
+                        // Only include Archive country in the count if it's specifically selected
+                        if (country !== 'Archive' || selectedCountry === 'Archive') {
+                            totalJobCount += countryJobs.length;
                         }
-                    }
+                    });
                 }
 
-                // Calculate total job count across all countries (excluding Archive unless it's selected)
-                Object.entries(data.linkedInJobsByCountry).forEach(([country, countryJobs]) => {
-                    // Only include Archive country in the count if it's specifically selected
-                    if (country !== 'Archive' || selectedCountry === 'Archive') {
-                        totalJobCount += countryJobs.length;
-                    }
-                });
-            } else if (data.linkedInJobs) {
-                // Fall back to old format
-                allJobs = data.linkedInJobs;
-                totalJobCount = allJobs.length;
-            } else {
-                // No jobs available
-                renderJobListings([]);
-                scrapeInfo.textContent = 'No job data available';
-                return;
-            }
+                // Render the jobs using optimized rendering
+                renderJobListingsOptimized(tabFilteredJobs);
 
-            // Apply text search filter
-            const filteredJobs = allJobs.filter(job => {
-                return job.title.toLowerCase().includes(searchTerm) ||
-                       job.company.toLowerCase().includes(searchTerm) ||
-                       job.location.toLowerCase().includes(searchTerm) ||
-                       (job.applicationInsight && job.applicationInsight.toLowerCase().includes(searchTerm)) ||
-                       (job.jobId && job.jobId.toLowerCase().includes(searchTerm));
+                // Update status text with filter information
+                let statusText = `Showing ${tabFilteredJobs.length} of ${totalJobCount} jobs`;
+
+                // Add country information
+                if (selectedCountry) {
+                    statusText += ` in ${selectedCountry}`;
+                }
+
+                // Add tab information
+                if (activeTabId === 'unapplied-jobs') {
+                    statusText += " (not applied)";
+                } else if (activeTabId === 'applied-jobs') {
+                    statusText += " (applied)";
+                } else if (activeTabId === 'archive-jobs') {
+                    statusText += " (archived)";
+                }
+
+                if (searchTerm) {
+                    statusText += ` (filtered by "${searchTerm}")`;
+                }
+
+                scrapeInfo.textContent = statusText;
             });
+        });
+    }
 
-            // Apply tab-specific filtering
-            let tabFilteredJobs = filteredJobs;
+    // Optimized rendering function that uses document fragments and batched DOM operations
+    function renderJobListingsOptimized(jobs) {
+        // Clear the container
+        jobListingsContainer.innerHTML = '';
 
-            if (activeTabId === 'unapplied-jobs') {
-                // Show only non-applied jobs
-                tabFilteredJobs = filteredJobs.filter(job => !job.isApplied);
-            } else if (activeTabId === 'applied-jobs') {
-                // Show only applied jobs
-                tabFilteredJobs = filteredJobs.filter(job => job.isApplied);
-            } else if (activeTabId === 'archive-jobs') {
-                // Show all jobs in Archive (already filtered by country above)
-                tabFilteredJobs = filteredJobs;
+        if (!jobs || jobs.length === 0) {
+            jobListingsContainer.innerHTML = '<p>No job listings match your current filters.</p>';
+            return;
+        }
+
+        // Categorize jobs by date
+        const categorizedJobs = categorizeJobsByDate(jobs);
+
+        // Create a document fragment to batch DOM operations
+        const fragment = document.createDocumentFragment();
+
+        // Create sections for each category
+        const sections = [];
+
+        // Add sections to the fragment if they have jobs
+        if (categorizedJobs.pinned.length > 0) {
+            const pinnedSection = createDateCategorySection('pinned', categorizedJobs.pinned);
+            sections.push({ section: pinnedSection, jobs: categorizedJobs.pinned });
+            fragment.appendChild(pinnedSection.sectionDiv);
+        }
+
+        if (categorizedJobs.past24Hours.length > 0) {
+            const past24HoursSection = createDateCategorySection('past24Hours', categorizedJobs.past24Hours);
+            sections.push({ section: past24HoursSection, jobs: categorizedJobs.past24Hours });
+            fragment.appendChild(past24HoursSection.sectionDiv);
+        }
+
+        if (categorizedJobs.pastWeek.length > 0) {
+            const pastWeekSection = createDateCategorySection('pastWeek', categorizedJobs.pastWeek);
+            sections.push({ section: pastWeekSection, jobs: categorizedJobs.pastWeek });
+            fragment.appendChild(pastWeekSection.sectionDiv);
+        }
+
+        if (categorizedJobs.pastMonth.length > 0) {
+            const pastMonthSection = createDateCategorySection('pastMonth', categorizedJobs.pastMonth, true);
+            sections.push({ section: pastMonthSection, jobs: categorizedJobs.pastMonth });
+            fragment.appendChild(pastMonthSection.sectionDiv);
+        }
+
+        if (categorizedJobs.older.length > 0) {
+            const olderSection = createDateCategorySection('older', categorizedJobs.older, true);
+            sections.push({ section: olderSection, jobs: categorizedJobs.older });
+            fragment.appendChild(olderSection.sectionDiv);
+        }
+
+        // Append the fragment to the container (single DOM operation)
+        jobListingsContainer.appendChild(fragment);
+
+        // Render jobs for each section using batch processing
+        sections.forEach(({ section, jobs }) => {
+            // Create a document fragment for this section's jobs
+            const jobsFragment = document.createDocumentFragment();
+
+            // Render jobs in batches of 20 to avoid blocking the UI
+            const batchSize = 20;
+            let currentBatch = 0;
+
+            function renderBatch() {
+                const start = currentBatch * batchSize;
+                const end = Math.min(start + batchSize, jobs.length);
+
+                if (start >= jobs.length) {
+                    // All batches rendered
+                    return;
+                }
+
+                // Render this batch of jobs
+                for (let i = start; i < end; i++) {
+                    const jobCard = createJobCard(jobs[i]);
+                    jobsFragment.appendChild(jobCard);
+                }
+
+                // Append this batch to the section
+                section.contentDiv.appendChild(jobsFragment);
+
+                // Schedule the next batch
+                currentBatch++;
+                if (currentBatch * batchSize < jobs.length) {
+                    setTimeout(renderBatch, 0);
+                }
             }
 
-            renderJobListings(tabFilteredJobs);
+            // Start rendering batches
+            renderBatch();
+        });
+    }
 
-            // Update status text with filter information
-            let statusText = `Showing ${tabFilteredJobs.length} of ${totalJobCount} jobs`;
+    // Function to create a job card element
+    function createJobCard(job) {
+        const jobCard = document.createElement('div');
+        jobCard.className = job.isPinned ? 'job-card pinned' : 'job-card';
 
-            // Add country information
-            if (selectedCountry) {
-                statusText += ` in ${selectedCountry}`;
+        // Create badges for Easy Apply, Promoted, Pinned, and Applied
+        const badges = [];
+        if (job.isPinned) {
+            badges.push('<span class="job-badge pinned">Pinned</span>');
+        }
+        if (job.isEasyApply) {
+            badges.push('<span class="job-badge easy-apply">Easy Apply</span>');
+        }
+        if (job.isPromoted) {
+            badges.push('<span class="job-badge promoted">Promoted</span>');
+        }
+        if (job.isApplied) {
+            badges.push('<span class="job-badge applied">Applied</span>');
+        }
+
+        // Add country badge if available
+        if (job.country && job.country !== 'Unknown') {
+            badges.push(`<span class="job-badge country">${job.country}</span>`);
+        }
+
+        // Format application insight if available
+        const insightHtml = job.applicationInsight ?
+            `<div class="job-insight">${job.applicationInsight}</div>` : '';
+
+        // Add details badge if we have scraped additional details
+        if (job.detailsScraped) {
+            badges.push('<span class="job-badge details">Details Available</span>');
+        }
+
+        // Format posting date if available
+        let postingDateHtml = '';
+        if (job.convertedDate && job.convertedDate.formattedDate) {
+            postingDateHtml = `<div class="job-posting-date">Posted: ${job.convertedDate.formattedDate}</div>`;
+        } else if (job.postingDate) {
+            postingDateHtml = `<div class="job-posting-date">Posted: ${job.postingDate}</div>`;
+        }
+
+        jobCard.innerHTML = `
+            <div class="job-header">
+                <div class="job-title">${job.title}</div>
+                <div class="job-badges">${badges.join('')}</div>
+            </div>
+            <div class="job-company">${job.company}</div>
+            <div class="job-location">${job.location}</div>
+            ${postingDateHtml}
+            ${insightHtml}
+            ${job.isPinned ?
+                `<button class="job-pin-button job-pin-corner job-unpin-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Unpin this job"><i class="fas fa-thumbtack fa-rotate-90"></i></button>` :
+                `<button class="job-pin-button job-pin-corner" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Pin this job to top"><i class="fas fa-thumbtack"></i></button>`
             }
+            <div class="job-actions">
+                <a href="javascript:void(0)" class="apply-button view-job-btn" data-job-id="${job.jobId || ''}" data-job-url="${job.jobUrl}" data-job-country="${job.country || ''}" title="View job details"><i class="fas fa-eye"></i> View</a>
+                <a href="${job.jobUrl || (job.jobId ? `https://www.linkedin.com/jobs/view/${job.jobId}/` : '#')}" target="_blank" class="apply-button linkedin-btn" title="Open LinkedIn job page"><i class="fab fa-linkedin"></i> LinkedIn</a>
+                ${job.country === 'Archive' ?
+                    `<button class="job-unarchive-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" data-original-country="${job.originalCountry || 'Unknown'}" title="Unarchive this job"><i class="fas fa-box-open"></i></button>` :
+                    `<button class="job-archive-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Archive this job"><i class="fas fa-archive"></i></button>`
+                }
+                ${job.isApplied ?
+                    `<button class="job-unapplied-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Mark as not applied"><i class="fas fa-check-circle"></i></button>` :
+                    `<button class="job-applied-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Mark as applied"><i class="fas fa-check"></i></button>`
+                }
+                <button class="job-delete-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Delete this job permanently"><i class="fas fa-trash-alt"></i></button>
+                ${job.tailoringStatus ?
+                    `<span class="job-tailoring-status ${job.tailoringStatus}">
+                        ${job.tailoringStatus === 'queued' ? '<i class="fas fa-hourglass-start"></i> CV Queued' :
+                          job.tailoringStatus === 'processing' ? '<i class="fas fa-spinner fa-spin"></i> CV Processing' :
+                          job.tailoringStatus === 'completed' ? `<i class="fas fa-check-circle"></i> CV Ready${job.tailoredCvFilename ? `: ${job.tailoredCvFilename}` : ''}` :
+                          job.tailoringStatus === 'failed' ? '<i class="fas fa-exclamation-circle"></i> CV Failed' : ''}
+                        <button class="reset-cv-status-btn" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Reset CV status"><i class="fas fa-times"></i></button>
+                    </span>` : ''
+                }
+                <span class="job-id">ID: ${job.jobId || 'N/A'}</span>
+            </div>
+        `;
 
-            // Add tab information
-            if (activeTabId === 'unapplied-jobs') {
-                statusText += " (not applied)";
-            } else if (activeTabId === 'applied-jobs') {
-                statusText += " (applied)";
-            } else if (activeTabId === 'archive-jobs') {
-                statusText += " (archived)";
+        // Add event listeners using event delegation
+        setupJobCardEventListeners(jobCard, job);
+
+        return jobCard;
+    }
+
+    // Function to set up event listeners for a job card
+    function setupJobCardEventListeners(jobCard, job) {
+        // Get the View Job button
+        const viewJobBtn = jobCard.querySelector('.view-job-btn');
+
+        // Add hover event to scrape job details
+        viewJobBtn.addEventListener('mouseenter', function() {
+            const jobId = this.getAttribute('data-job-id');
+            const jobUrl = this.getAttribute('data-job-url');
+            const country = this.getAttribute('data-job-country');
+
+            // Only scrape if we haven't already, we're not currently scraping, and the job is not archived
+            if (!job.detailsScraped && !job.isScrapingDetails && jobId && jobUrl && job.country !== 'Archive') {
+                // Mark that we're starting to scrape
+                job.isScrapingDetails = true;
+
+                // Show loading indicator
+                this.classList.add('loading');
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+
+                // Scrape job details
+                scrapeJobDetails(jobUrl, jobId, country).then(jobDetails => {
+                    // Remove loading indicator
+                    this.classList.remove('loading');
+                    this.innerHTML = '<i class="fas fa-eye"></i> View';
+
+                    // Reset scraping flag
+                    job.isScrapingDetails = false;
+
+                    if (jobDetails) {
+                        // Update the job with the scraped details
+                        updateJobWithDetails(jobId, country, jobDetails);
+
+                        // Update the current job object for immediate use
+                        Object.assign(job, jobDetails, { detailsScraped: true });
+
+                        // Add the details badge to the job card
+                        const badgesContainer = jobCard.querySelector('.job-badges');
+
+                        // Add Details Available badge if not already present
+                        if (badgesContainer && !jobCard.querySelector('.job-badge.details')) {
+                            const detailsBadge = document.createElement('span');
+                            detailsBadge.className = 'job-badge details';
+                            detailsBadge.textContent = 'Details Available';
+                            badgesContainer.appendChild(detailsBadge);
+                        }
+
+                        // Add Easy Apply badge if the job is detected as Easy Apply and badge not already present
+                        if (jobDetails.isEasyApply === true && badgesContainer && !jobCard.querySelector('.job-badge.easy-apply')) {
+                            const easyApplyBadge = document.createElement('span');
+                            easyApplyBadge.className = 'job-badge easy-apply';
+                            easyApplyBadge.textContent = 'Easy Apply';
+                            badgesContainer.appendChild(easyApplyBadge);
+
+                            // Also update the job object's isEasyApply property
+                            job.isEasyApply = true;
+                        }
+                    }
+                }).catch(() => {
+                    // Remove loading indicator
+                    this.classList.remove('loading');
+                    this.innerHTML = '<i class="fas fa-eye"></i> View';
+
+                    // Reset scraping flag
+                    job.isScrapingDetails = false;
+                });
             }
+        });
 
-            if (searchTerm) {
-                statusText += ` (filtered by "${searchTerm}")`;
+        // Add click event to show popup with job details
+        viewJobBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            openJobDetailsPopup(job);
+        });
+
+        // Use event delegation for other buttons
+        jobCard.addEventListener('click', function(e) {
+            const target = e.target.closest('button');
+            if (!target) return;
+
+            const jobId = target.getAttribute('data-job-id');
+            const country = target.getAttribute('data-job-country');
+
+            // Handle different button types
+            if (target.classList.contains('job-archive-button')) {
+                e.preventDefault();
+                if (!jobId || !country) {
+                    alert('Cannot archive job: Need both job ID and country to archive');
+                    return;
+                }
+                archiveSingleJob(jobId, country, jobCard);
             }
-
-            scrapeInfo.textContent = statusText;
+            else if (target.classList.contains('job-unarchive-button')) {
+                e.preventDefault();
+                const originalCountry = target.getAttribute('data-original-country');
+                if (!jobId || country !== 'Archive') {
+                    alert('Cannot unarchive job: Invalid job ID or job is not archived');
+                    return;
+                }
+                unarchiveSingleJob(jobId, originalCountry, jobCard);
+            }
+            else if (target.classList.contains('job-delete-button')) {
+                e.preventDefault();
+                deleteSingleJob(jobId, country, jobCard);
+            }
+            else if (target.classList.contains('reset-cv-status-btn')) {
+                e.preventDefault();
+                e.stopPropagation(); // Prevent event from bubbling up
+                if (jobId && country) {
+                    resetJobTailoringStatus(jobId, country);
+                }
+            }
+            else if (target.classList.contains('job-applied-button')) {
+                e.preventDefault();
+                if (!jobId || !country) {
+                    alert('Cannot mark job as applied: Need both job ID and country');
+                    return;
+                }
+                markJobAsApplied(jobId, country, jobCard);
+            }
+            else if (target.classList.contains('job-unapplied-button')) {
+                e.preventDefault();
+                if (!jobId || !country) {
+                    alert('Cannot mark job as not applied: Need both job ID and country');
+                    return;
+                }
+                markJobAsUnapplied(jobId, country, jobCard);
+            }
+            else if (target.classList.contains('job-pin-button')) {
+                e.preventDefault();
+                if (!jobId || !country) {
+                    alert('Cannot pin job: Need both job ID and country');
+                    return;
+                }
+                pinJob(jobId, country);
+            }
+            else if (target.classList.contains('job-unpin-button')) {
+                e.preventDefault();
+                if (!jobId || !country) {
+                    alert('Cannot unpin job: Need both job ID and country');
+                    return;
+                }
+                unpinJob(jobId, country);
+            }
         });
     }
 });

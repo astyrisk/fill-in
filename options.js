@@ -40,6 +40,7 @@ function saveOptions() {
 
   // Tailor settings
   const openrouterApiKey = document.getElementById('openrouterApiKey').value;
+  const tailorPrompt = document.getElementById('tailor-prompt').value;
 
   chrome.storage.sync.set(
     {
@@ -71,7 +72,8 @@ function saveOptions() {
       highlightWords: highlightWords,
       excludeTitleWords: excludeTitleWords,
       tailorSettings: {
-        openrouterApiKey: openrouterApiKey
+        openrouterApiKey: openrouterApiKey,
+        tailorPrompt: tailorPrompt
       }
     },
     () => {
@@ -98,7 +100,8 @@ function restoreOptions() {
       highlightWords: 'experience,',
       excludeTitleWords: '',
       tailorSettings: {
-        openrouterApiKey: ''
+        openrouterApiKey: '',
+        tailorPrompt: ''
       }
     },
     (items) => {
@@ -146,6 +149,15 @@ function restoreOptions() {
       // Restore tailor settings
       if (items.tailorSettings) {
         document.getElementById('openrouterApiKey').value = items.tailorSettings.openrouterApiKey || '';
+
+        // Restore tailor prompt or set default if empty
+        const tailorPromptElement = document.getElementById('tailor-prompt');
+        if (items.tailorSettings.tailorPrompt) {
+          tailorPromptElement.value = items.tailorSettings.tailorPrompt;
+        } else {
+          // Set default prompt
+          tailorPromptElement.value = getDefaultTailorPrompt();
+        }
       }
     }
   );
@@ -721,6 +733,252 @@ function testApiKey() {
   });
 }
 
+// Function to export settings to a JSON file
+function exportSettings() {
+  chrome.storage.sync.get(null, (items) => {
+    // Create a JSON string from the settings
+    const settingsJson = JSON.stringify(items, null, 2);
+
+    // Create a Blob with the JSON data
+    const blob = new Blob([settingsJson], { type: 'application/json' });
+
+    // Create a URL for the Blob
+    const url = URL.createObjectURL(blob);
+
+    // Create a temporary link element
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fill-in-settings-${new Date().toISOString().split('T')[0]}.json`;
+
+    // Trigger the download
+    document.body.appendChild(a);
+    a.click();
+
+    // Clean up
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+
+    // Show success message
+    const statusElement = document.getElementById('import-settings-status');
+    statusElement.innerHTML = '<span style="color: var(--success-color);"><i class="fas fa-check-circle"></i> Settings exported successfully</span>';
+
+    // Clear the message after a delay
+    setTimeout(() => {
+      statusElement.innerHTML = '';
+    }, 3000);
+  });
+}
+
+// Function to import settings from a JSON file
+function importSettings() {
+  const fileInput = document.getElementById('import-settings-file');
+  const statusElement = document.getElementById('import-settings-status');
+
+  if (!fileInput.files || fileInput.files.length === 0) {
+    statusElement.innerHTML = '<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> No file selected</span>';
+    return;
+  }
+
+  const file = fileInput.files[0];
+  if (!file.name.endsWith('.json')) {
+    statusElement.innerHTML = '<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Please select a JSON file</span>';
+    return;
+  }
+
+  statusElement.innerHTML = '<span style="color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Importing settings...</span>';
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    try {
+      const settings = JSON.parse(event.target.result);
+
+      // Validate the settings object
+      if (!settings || typeof settings !== 'object') {
+        throw new Error('Invalid settings format');
+      }
+
+      // Save the imported settings
+      chrome.storage.sync.set(settings, () => {
+        if (chrome.runtime.lastError) {
+          statusElement.innerHTML = `<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Error: ${chrome.runtime.lastError.message}</span>`;
+          return;
+        }
+
+        // Show success message
+        statusElement.innerHTML = '<span style="color: var(--success-color);"><i class="fas fa-check-circle"></i> Settings imported successfully</span>';
+
+        // Restore the options to reflect the imported settings
+        restoreOptions();
+
+        // Clear the file input
+        fileInput.value = '';
+
+        // Clear the message after a delay
+        setTimeout(() => {
+          statusElement.innerHTML = '';
+        }, 3000);
+      });
+    } catch (error) {
+      console.error('Error importing settings:', error);
+      statusElement.innerHTML = `<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Error: ${error.message}</span>`;
+    }
+  };
+
+  reader.onerror = () => {
+    statusElement.innerHTML = '<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Error reading file</span>';
+  };
+
+  reader.readAsText(file);
+}
+
+// Function to export jobs to a JSON file
+function exportJobs() {
+  chrome.storage.local.get(['linkedInJobsByCountry', 'linkedInJobs', 'countries', 'scrapeTimestamp', 'capturedApplicationUrls'], (items) => {
+    // Create a JSON string from the jobs data
+    const jobsJson = JSON.stringify(items, null, 2);
+
+    // Create a Blob with the JSON data
+    const blob = new Blob([jobsJson], { type: 'application/json' });
+
+    // Create a URL for the Blob
+    const url = URL.createObjectURL(blob);
+
+    // Create a temporary link element
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fill-in-jobs-${new Date().toISOString().split('T')[0]}.json`;
+
+    // Trigger the download
+    document.body.appendChild(a);
+    a.click();
+
+    // Clean up
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+
+    // Show success message
+    const statusElement = document.getElementById('import-jobs-status');
+    statusElement.innerHTML = '<span style="color: var(--success-color);"><i class="fas fa-check-circle"></i> Jobs exported successfully</span>';
+
+    // Clear the message after a delay
+    setTimeout(() => {
+      statusElement.innerHTML = '';
+    }, 3000);
+  });
+}
+
+// Function to import jobs from a JSON file
+function importJobs() {
+  const fileInput = document.getElementById('import-jobs-file');
+  const statusElement = document.getElementById('import-jobs-status');
+
+  if (!fileInput.files || fileInput.files.length === 0) {
+    statusElement.innerHTML = '<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> No file selected</span>';
+    return;
+  }
+
+  const file = fileInput.files[0];
+  if (!file.name.endsWith('.json')) {
+    statusElement.innerHTML = '<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Please select a JSON file</span>';
+    return;
+  }
+
+  statusElement.innerHTML = '<span style="color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Importing jobs...</span>';
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    try {
+      const jobsData = JSON.parse(event.target.result);
+
+      // Validate the jobs data
+      if (!jobsData || typeof jobsData !== 'object') {
+        throw new Error('Invalid jobs data format');
+      }
+
+      // Get current jobs data to merge with imported data
+      chrome.storage.local.get(['linkedInJobsByCountry', 'capturedApplicationUrls'], (currentData) => {
+        const currentJobsByCountry = currentData.linkedInJobsByCountry || {};
+        const currentCapturedUrls = currentData.capturedApplicationUrls || {};
+
+        // Merge the imported jobs with current jobs
+        const mergedJobsByCountry = { ...currentJobsByCountry };
+
+        // If the imported data has linkedInJobsByCountry, merge it
+        if (jobsData.linkedInJobsByCountry) {
+          Object.keys(jobsData.linkedInJobsByCountry).forEach(country => {
+            if (!mergedJobsByCountry[country]) {
+              mergedJobsByCountry[country] = [];
+            }
+
+            // Add each job from the imported data, avoiding duplicates
+            jobsData.linkedInJobsByCountry[country].forEach(importedJob => {
+              // Check if the job already exists
+              const existingJobIndex = mergedJobsByCountry[country].findIndex(job => job.jobId === importedJob.jobId);
+
+              if (existingJobIndex === -1) {
+                // Job doesn't exist, add it
+                mergedJobsByCountry[country].push(importedJob);
+              } else {
+                // Job exists, update it
+                mergedJobsByCountry[country][existingJobIndex] = importedJob;
+              }
+            });
+          });
+        }
+
+        // Merge captured application URLs
+        const mergedCapturedUrls = { ...currentCapturedUrls };
+        if (jobsData.capturedApplicationUrls) {
+          Object.keys(jobsData.capturedApplicationUrls).forEach(jobId => {
+            mergedCapturedUrls[jobId] = jobsData.capturedApplicationUrls[jobId];
+          });
+        }
+
+        // Create a flat list of all jobs for backward compatibility
+        const allJobs = Object.values(mergedJobsByCountry).flat();
+
+        // Save the merged data
+        chrome.storage.local.set({
+          linkedInJobsByCountry: mergedJobsByCountry,
+          linkedInJobs: allJobs,
+          countries: Object.keys(mergedJobsByCountry),
+          capturedApplicationUrls: mergedCapturedUrls,
+          scrapeTimestamp: new Date().toISOString()
+        }, () => {
+          if (chrome.runtime.lastError) {
+            statusElement.innerHTML = `<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Error: ${chrome.runtime.lastError.message}</span>`;
+            return;
+          }
+
+          // Show success message
+          statusElement.innerHTML = '<span style="color: var(--success-color);"><i class="fas fa-check-circle"></i> Jobs imported successfully</span>';
+
+          // Clear the file input
+          fileInput.value = '';
+
+          // Clear the message after a delay
+          setTimeout(() => {
+            statusElement.innerHTML = '';
+          }, 3000);
+        });
+      });
+    } catch (error) {
+      console.error('Error importing jobs:', error);
+      statusElement.innerHTML = `<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Error: ${error.message}</span>`;
+    }
+  };
+
+  reader.onerror = () => {
+    statusElement.innerHTML = '<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Error reading file</span>';
+  };
+
+  reader.readAsText(file);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   restoreOptions();
   setupFilterFormSlider();
@@ -742,6 +1000,241 @@ document.addEventListener('DOMContentLoaded', () => {
   if (testApiKeyButton) {
     testApiKeyButton.addEventListener('click', testApiKey);
   }
+
+  // Add event listener for reset prompt button
+  const resetPromptButton = document.getElementById('reset-prompt');
+  if (resetPromptButton) {
+    resetPromptButton.addEventListener('click', resetTailorPrompt);
+  }
+
+  // Add event listeners for import/export settings
+  const exportSettingsButton = document.getElementById('export-settings');
+  if (exportSettingsButton) {
+    exportSettingsButton.addEventListener('click', exportSettings);
+  }
+
+  const importSettingsButton = document.getElementById('import-settings');
+  if (importSettingsButton) {
+    importSettingsButton.addEventListener('click', () => {
+      // Trigger the file input click
+      document.getElementById('import-settings-file').click();
+    });
+  }
+
+  const importSettingsFileInput = document.getElementById('import-settings-file');
+  if (importSettingsFileInput) {
+    importSettingsFileInput.addEventListener('change', importSettings);
+  }
+
+  // Add event listeners for import/export jobs
+  const exportJobsButton = document.getElementById('export-jobs');
+  if (exportJobsButton) {
+    exportJobsButton.addEventListener('click', exportJobs);
+  }
+
+  const importJobsButton = document.getElementById('import-jobs');
+  if (importJobsButton) {
+    importJobsButton.addEventListener('click', () => {
+      // Trigger the file input click
+      document.getElementById('import-jobs-file').click();
+    });
+  }
+
+  const importJobsFileInput = document.getElementById('import-jobs-file');
+  if (importJobsFileInput) {
+    importJobsFileInput.addEventListener('change', importJobs);
+  }
+
+  // Add event listeners for reset options
+  const resetSettingsButton = document.getElementById('reset-settings');
+  if (resetSettingsButton) {
+    resetSettingsButton.addEventListener('click', resetAllSettings);
+  }
+
+  const removeAllJobsButton = document.getElementById('remove-all-jobs');
+  if (removeAllJobsButton) {
+    removeAllJobsButton.addEventListener('click', removeAllJobs);
+  }
+
+  const resetEverythingButton = document.getElementById('reset-everything');
+  if (resetEverythingButton) {
+    resetEverythingButton.addEventListener('click', resetEverything);
+  }
 });
 
 document.getElementById('save').addEventListener('click', saveOptions);
+
+// Function to get the default tailor prompt
+function getDefaultTailorPrompt() {
+  return `You are an expert resume writer. I have a default CV in YAML format and a job description.
+Tailor the CV to match the ats important keywords and
+to optimize it for ATS systems. pick the relavant projects (4 projects) and activities.
+Don't add new information.
+Return *only* the tailored CV in YAML format, with no additional text
+or explanations. Ensure all 'highlights' fields are simple strings (e.g., 'GPA: 4.0/5.0').
+IMPORTANT: You must preserve the exact same order of sections and fields as in the original YAML.
+Do not change the structure or order of the YAML, only modify the content to match the job description.
+You can change the following fields: name, date, label, details, highlights
+In summary, I am a fresh graduate student, So you can start with that .
+Use ** to make text bold as markdown syntax.
+Don't add any new fields.
+Also, add a field called 'filename' at the very top of the YAML with a suggested filename for the CV that includes the job title.
+Here is the exact format of the original YAML:
+
+{original_yaml}
+
+Job Description:
+{job_description}
+
+Output the tailored CV in YAML format with the exact same structure and order as the original, plus the filename field at the top.`;
+}
+
+// Function to reset the tailor prompt to default
+function resetTailorPrompt() {
+  const tailorPromptElement = document.getElementById('tailor-prompt');
+  tailorPromptElement.value = getDefaultTailorPrompt();
+
+  // Show a temporary message
+  const resetButton = document.getElementById('reset-prompt');
+  const originalText = resetButton.innerHTML;
+  resetButton.innerHTML = '<i class="fas fa-check"></i> Default Prompt Restored';
+  resetButton.disabled = true;
+
+  setTimeout(() => {
+    resetButton.innerHTML = originalText;
+    resetButton.disabled = false;
+  }, 2000);
+}
+
+// Function to reset all settings
+function resetAllSettings() {
+  if (!confirm('Are you sure you want to reset all settings? This will remove all your personal information, job filters, and tailor settings. This action cannot be undone.')) {
+    return;
+  }
+
+  // Clear all settings in chrome.storage.sync
+  chrome.storage.sync.clear(() => {
+    if (chrome.runtime.lastError) {
+      alert(`Error: ${chrome.runtime.lastError.message}`);
+      return;
+    }
+
+    // Set default values
+    chrome.storage.sync.set({
+      userData: {},
+      jobFilters: [],
+      highlightWords: 'experience,',
+      excludeTitleWords: '',
+      tailorSettings: {
+        openrouterApiKey: '',
+        tailorPrompt: getDefaultTailorPrompt()
+      }
+    }, () => {
+      // Reset global variables
+      jobFilters = [];
+      currentEditingFilterId = null;
+
+      // Restore options with default values
+      restoreOptions();
+
+      // Show success message
+      const status = document.getElementById('status');
+      status.innerHTML = '<i class="fas fa-check-circle"></i> All settings have been reset';
+      status.classList.add('show');
+
+      // Hide the status message after a delay
+      setTimeout(() => {
+        status.classList.remove('show');
+      }, 2000);
+    });
+  });
+}
+
+// Function to remove all jobs
+function removeAllJobs() {
+  if (!confirm('Are you sure you want to remove all jobs? This will delete all your scraped jobs from all countries. This action cannot be undone.')) {
+    return;
+  }
+
+  // Clear job-related data in chrome.storage.local
+  chrome.storage.local.remove([
+    'linkedInJobsByCountry',
+    'linkedInJobs',
+    'countries',
+    'capturedApplicationUrls',
+    'scrapeTimestamp'
+  ], () => {
+    if (chrome.runtime.lastError) {
+      alert(`Error: ${chrome.runtime.lastError.message}`);
+      return;
+    }
+
+    // Show success message
+    const status = document.getElementById('status');
+    status.innerHTML = '<i class="fas fa-check-circle"></i> All jobs have been removed';
+    status.classList.add('show');
+
+    // Hide the status message after a delay
+    setTimeout(() => {
+      status.classList.remove('show');
+    }, 2000);
+  });
+}
+
+// Function to reset everything (settings and jobs)
+function resetEverything() {
+  if (!confirm('Are you sure you want to reset everything? This will remove all your settings and jobs, completely resetting the extension to its initial state. This action cannot be undone.')) {
+    return;
+  }
+
+  // First reset all settings
+  chrome.storage.sync.clear(() => {
+    if (chrome.runtime.lastError) {
+      alert(`Error: ${chrome.runtime.lastError.message}`);
+      return;
+    }
+
+    // Set default values for settings
+    chrome.storage.sync.set({
+      userData: {},
+      jobFilters: [],
+      highlightWords: 'experience,',
+      excludeTitleWords: '',
+      tailorSettings: {
+        openrouterApiKey: '',
+        tailorPrompt: getDefaultTailorPrompt()
+      }
+    }, () => {
+      // Reset global variables
+      jobFilters = [];
+      currentEditingFilterId = null;
+
+      // Then remove all jobs
+      chrome.storage.local.remove([
+        'linkedInJobsByCountry',
+        'linkedInJobs',
+        'countries',
+        'capturedApplicationUrls',
+        'scrapeTimestamp'
+      ], () => {
+        if (chrome.runtime.lastError) {
+          alert(`Error: ${chrome.runtime.lastError.message}`);
+          return;
+        }
+
+        // Restore options with default values
+        restoreOptions();
+
+        // Show success message
+        const status = document.getElementById('status');
+        status.innerHTML = '<i class="fas fa-check-circle"></i> Extension has been completely reset';
+        status.classList.add('show');
+
+        // Hide the status message after a delay
+        setTimeout(() => {
+          status.classList.remove('show');
+        }, 2000);
+      });
+    });
+  });
+}
