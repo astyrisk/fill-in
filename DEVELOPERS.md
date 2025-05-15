@@ -7,6 +7,8 @@ This document provides technical information for developers who want to contribu
 - `background.js`: Main background script for the extension
 - `form-filler/`: Form filling functionality
 - `job-scraper/`: LinkedIn job scraping functionality
+- `options/`: Settings page and related functionality
+- `popup/`: Extension popup interface
 - `tailor/`: CV tailoring server
 - `@tests/`: Unified test suite organized by functionality
   - `job-filters/`: Tests for job filter functionality
@@ -118,6 +120,7 @@ The extension follows a modular architecture:
 2. **Job Scraper Module**: Manages LinkedIn job scraping and storage
 3. **Form Filler Module**: Detects and fills form fields
 4. **CV Tailoring Module**: Communicates with the local tailoring server
-5. **Settings Module**: Manages user configuration
+5. **Settings Module**: Manages user configuration (located in the `options/` directory)
+6. **Popup Module**: Provides quick access to main features
 
 Each module is designed to be independent, making the codebase easier to maintain and extend.
