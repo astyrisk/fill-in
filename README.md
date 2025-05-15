@@ -113,7 +113,29 @@ tests/test-runner.html
 ```
 
 ## Roadmap
-
+### 0.2.0
+- [ ] how to deal with jobs without date information
+- [ ] test api key validation
+- [ ] user should be able to control tailor's prompt
+- [ ] import/export settings and jobs
+- [ ] link settings to the listing and vice versa
+- [ ] option to reset all jobs and settings.
+- [ ] tutorial on how to use the extension
+- [ ] unify tests
+- [ ] separate it to a normal wiki and developer wiki
+### 0.3.0
+- [ ] AI filtering for job descriptions
+- [ ] optimize memory usage
+- [ ] is there a way to this without having to login?
+- [ ] Fix form filling errors appearing in console
+- [ ] Support for myworkday sites
+- [ ] Support for companies' independent career sites
+- [ ] Support for additional job sites (Indeed, Glassdoor)
+- [ ] Support for more applicant tracking systems (Greenhouse, Workable, SmartRecruiters)
+- [ ] Education field auto-filling
+  - Highest Level of Education
+  - Major/Field of Study
+  - Institution Name
 ### Completed
 - [x] Fix apply URL functionality
 - [x] Implement PIN and UNPIN features
@@ -131,18 +153,6 @@ tests/test-runner.html
 - [x] Sort jobs with date labels (last day, last week, etc.)
 
 ### In Progress
-- [ ] Fix jobs without date information
-- [ ] AI filtering for job descriptions
-- [ ] Test API key validation
-- [ ] Fix form filling errors appearing in console
-- [ ] Support for myworkday sites
-- [ ] Support for companies' independent career sites
-- [ ] Support for additional job sites (Indeed, Glassdoor)
-- [ ] Support for more applicant tracking systems (Greenhouse, Workable, SmartRecruiters)
-- [ ] Education field auto-filling
-  - Highest Level of Education
-  - Major/Field of Study
-  - Institution Name
 
 ## License
 
