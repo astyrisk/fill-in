@@ -309,21 +309,12 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
             action: 'scrapeJobDetails',
             jobData: jobData // Pass the job data to the content script
           }, (response) => {
-            // Close the tab regardless of the result
-
-            setTimeout(() => {
-              chrome.tabs.remove(tabId, () => {
-                  if (chrome.runtime.lastError) {
-                    console.log("Tab may have already been closed");
-                  }
-                });
-            }, 1000); // 5 seconds
-
-            // chrome.tabs.remove(tabId, () => {
-            //   if (chrome.runtime.lastError) {
-            //     console.log("Tab may have already been closed");
-            //   }
-            // });
+            // Close the tab after receiving response
+            chrome.tabs.remove(tabId, () => {
+              if (chrome.runtime.lastError) {
+                console.log("Tab may have already been closed");
+              }
+            });
 
             if (chrome.runtime.lastError) {
               console.error("Error scraping job details:", chrome.runtime.lastError);
@@ -343,15 +334,51 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       };
 
       // Wait for the page to load before scraping
-      chrome.tabs.onUpdated.addListener(function listener(updatedTabId, changeInfo) {
+      const pageReadyListener = (updatedTabId, changeInfo) => {
         if (updatedTabId === tabId && changeInfo.status === 'complete') {
           // Remove the listener to avoid multiple calls
-          chrome.tabs.onUpdated.removeListener(listener);
-
-          // Wait a bit more for any dynamic content to load
-          setTimeout(scrapeJobDetails, 2000);
+          chrome.tabs.onUpdated.removeListener(pageReadyListener);
+          
+          // Check if the page content is ready by executing a script
+          chrome.scripting.executeScript({
+            target: { tabId },
+            function: () => {
+              // Check if key LinkedIn job page elements are present
+              const descriptionElement = document.querySelector('.jobs-description__content');
+              const jobInsightElement = document.querySelector('.job-details-jobs-unified-top-card__job-insight--highlight');
+              const applyButton = document.querySelector('#jobs-apply-button-id, .jobs-apply-button, button[role="link"][aria-label*="Apply"]');
+              
+              return {
+                ready: descriptionElement !== null || jobInsightElement !== null || applyButton !== null,
+                elements: {
+                  description: descriptionElement !== null,
+                  insights: jobInsightElement !== null,
+                  applyButton: applyButton !== null
+                }
+              };
+            }
+          }).then(results => {
+            const pageStatus = results[0]?.result;
+            console.log(`Page ready check for job ${jobId}:`, pageStatus);
+            
+            if (pageStatus && pageStatus.ready) {
+              // Page has key elements, proceed with scraping
+              scrapeJobDetails();
+            } else {
+              // Key elements not found yet, wait a bit and check again
+              console.log("Key job elements not found yet, waiting briefly...");
+              setTimeout(() => scrapeJobDetails(), 1000);
+            }
+          }).catch(error => {
+            console.error("Error checking page readiness:", error);
+            // Fall back to scraping anyway
+            scrapeJobDetails();
+          });
         }
-      });
+      };
+
+      // Add the listener
+      chrome.tabs.onUpdated.addListener(pageReadyListener);
     });
 
     return true; // Keep message channel open for async response
