@@ -420,8 +420,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const activeTab = document.querySelector('.tab.active');
         const activeTabId = activeTab ? activeTab.getAttribute('data-tab') : 'unapplied-jobs';
 
+        // For Archive tab, always use 'Archive' as the country regardless of dropdown selection
+        const effectiveCountry = activeTabId === 'archive-jobs' ? 'Archive' : selectedCountry;
+
         // Check if we have cached results for this combination
-        const cachedJobs = jobCache.get(selectedCountry, activeTabId, searchTerm);
+        const cachedJobs = jobCache.get(effectiveCountry, activeTabId, searchTerm);
         if (cachedJobs) {
             console.log('Using cached job results');
             callback(cachedJobs);
@@ -433,8 +436,12 @@ document.addEventListener('DOMContentLoaded', () => {
             let allJobs = [];
 
             if (data.linkedInJobsByCountry && Object.keys(data.linkedInJobsByCountry).length > 0) {
-                // If country is selected and not 'all', filter by country
-                if (selectedCountry && selectedCountry !== 'all') {
+                // If Archive tab is active, only show jobs from Archive country, regardless of dropdown selection
+                if (activeTabId === 'archive-jobs') {
+                    allJobs = data.linkedInJobsByCountry['Archive'] || [];
+                }
+                // If country is selected and not 'all', filter by country (except for Archive tab)
+                else if (selectedCountry && selectedCountry !== 'all') {
                     allJobs = data.linkedInJobsByCountry[selectedCountry] || [];
                 } else {
                     // If 'all' is selected, combine all countries except Archive
@@ -462,19 +469,21 @@ document.addEventListener('DOMContentLoaded', () => {
                        (job.jobId && job.jobId.toLowerCase().includes(searchTerm));
             });
 
-            // Apply tab-specific filtering
+            // Apply tab-specific filtering (only for non-archive tabs)
             let tabFilteredJobs = filteredJobs;
 
-            if (activeTabId === 'unapplied-jobs') {
-                // Show only non-applied jobs
-                tabFilteredJobs = filteredJobs.filter(job => !job.isApplied);
-            } else if (activeTabId === 'applied-jobs') {
-                // Show only applied jobs
-                tabFilteredJobs = filteredJobs.filter(job => job.isApplied);
+            if (activeTabId !== 'archive-jobs') {
+                if (activeTabId === 'unapplied-jobs') {
+                    // Show only non-applied jobs
+                    tabFilteredJobs = filteredJobs.filter(job => !job.isApplied);
+                } else if (activeTabId === 'applied-jobs') {
+                    // Show only applied jobs
+                    tabFilteredJobs = filteredJobs.filter(job => job.isApplied);
+                }
             }
 
-            // Store the results in cache
-            jobCache.set(selectedCountry, activeTabId, searchTerm, tabFilteredJobs);
+            // Store in cache for future use
+            jobCache.set(effectiveCountry, activeTabId, searchTerm, tabFilteredJobs);
 
             callback(tabFilteredJobs);
         });
@@ -642,7 +651,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 applicationInsight: jobToUnarchive.applicationInsight,
                 applyButtonType: jobToUnarchive.applyButtonType,
                 applicationUrl: jobToUnarchive.applicationUrl,
-                isPinned: jobToUnarchive.isPinned, // Preserve pinned status
+                isPinned: false, // Ensure unarchived jobs start unpinned
 
                 // Set country back to original
                 country: targetCountry,
@@ -724,7 +733,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 applicationInsight: jobToArchive.applicationInsight,
                 applyButtonType: jobToArchive.applyButtonType,
                 applicationUrl: jobToArchive.applicationUrl, // Preserve application URL if it exists
-                isPinned: jobToArchive.isPinned, // Preserve pinned status
+                isPinned: false, // Ensure archived jobs are not pinned
 
                 // Set archive-specific fields
                 country: 'Archive',
@@ -1838,6 +1847,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to pin a job
     function pinJob(jobId, country) {
+        // Don't allow pinning archived jobs
+        if (country === 'Archive') {
+            console.log('Cannot pin archived job');
+            return;
+        }
+
         chrome.storage.local.get(['linkedInJobsByCountry'], (data) => {
             if (!data.linkedInJobsByCountry) return;
 
@@ -1870,6 +1885,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to unpin a job
     function unpinJob(jobId, country) {
+        // Don't allow unpinning archived jobs
+        if (country === 'Archive') {
+            console.log('Cannot unpin archived job');
+            return;
+        }
+
         chrome.storage.local.get(['linkedInJobsByCountry'], (data) => {
             if (!data.linkedInJobsByCountry) return;
 
@@ -2079,8 +2100,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.linkedInJobsByCountry && Object.keys(data.linkedInJobsByCountry).length > 0) {
                     // Calculate total job count across all countries (excluding Archive unless it's selected)
                     Object.entries(data.linkedInJobsByCountry).forEach(([country, countryJobs]) => {
-                        // Only include Archive country in the count if it's specifically selected
-                        if (country !== 'Archive' || selectedCountry === 'Archive') {
+                        // Only include Archive country in the count if it's specifically selected or we're on the Archive tab
+                        if (country !== 'Archive' || activeTabId === 'archive-jobs' || selectedCountry === 'Archive') {
                             totalJobCount += countryJobs.length;
                         }
                     });
@@ -2092,8 +2113,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Update status text with filter information
                 let statusText = `Showing ${tabFilteredJobs.length} of ${totalJobCount} jobs`;
 
-                // Add country information
-                if (selectedCountry) {
+                // Add country information - for Archive tab, always show 'Archive' regardless of dropdown
+                if (activeTabId === 'archive-jobs') {
+                    statusText += ` in Archive`;
+                } else if (selectedCountry) {
                     statusText += ` in ${selectedCountry}`;
                 }
 
@@ -2258,9 +2281,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="job-location">${job.location}</div>
             ${postingDateHtml}
             ${insightHtml}
-            ${job.isPinned ?
-                `<button class="job-pin-button job-pin-corner job-unpin-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Unpin this job"><i class="fas fa-thumbtack fa-rotate-90"></i></button>` :
-                `<button class="job-pin-button job-pin-corner" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Pin this job to top"><i class="fas fa-thumbtack"></i></button>`
+            ${job.country !== 'Archive' ?
+                (job.isPinned ?
+                    `<button class="job-pin-button job-pin-corner job-unpin-button" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Unpin this job"><i class="fas fa-thumbtack fa-rotate-90"></i></button>` :
+                    `<button class="job-pin-button job-pin-corner" data-job-id="${job.jobId || ''}" data-job-country="${job.country || ''}" title="Pin this job to top"><i class="fas fa-thumbtack"></i></button>`
+                ) : ''
             }
             <div class="job-actions">
                 <a href="javascript:void(0)" class="apply-button view-job-btn" data-job-id="${job.jobId || ''}" data-job-url="${job.jobUrl}" data-job-country="${job.country || ''}" title="View job details"><i class="fas fa-eye"></i> View</a>
@@ -2421,21 +2446,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 markJobAsUnapplied(jobId, country, jobCard);
             }
-            else if (target.classList.contains('job-pin-button')) {
-                e.preventDefault();
-                if (!jobId || !country) {
-                    alert('Cannot pin job: Need both job ID and country');
-                    return;
-                }
-                pinJob(jobId, country);
-            }
             else if (target.classList.contains('job-unpin-button')) {
                 e.preventDefault();
                 if (!jobId || !country) {
                     alert('Cannot unpin job: Need both job ID and country');
                     return;
                 }
+                if (country === 'Archive') {
+                    alert('Archived jobs cannot be pinned or unpinned');
+                    return;
+                }
                 unpinJob(jobId, country);
+            }
+            else if (target.classList.contains('job-pin-button')) {
+                e.preventDefault();
+                if (!jobId || !country) {
+                    alert('Cannot pin job: Need both job ID and country');
+                    return;
+                }
+                if (country === 'Archive') {
+                    alert('Archived jobs cannot be pinned or unpinned');
+                    return;
+                }
+                pinJob(jobId, country);
             }
         });
     }
