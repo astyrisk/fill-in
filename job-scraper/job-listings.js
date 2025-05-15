@@ -197,6 +197,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Populate country dropdown
         populateCountryDropdown();
+
+        // Trigger a change event to ensure the UI is updated with the selected country
+        setTimeout(() => {
+            countrySelect.dispatchEvent(new Event('change'));
+        }, 100);
     }
 
     // Refresh button event listener removed
@@ -304,14 +309,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Sort countries alphabetically
             const sortedCountries = [...availableCountries].sort();
 
-            // Clear existing options except the 'All Countries' option
-            while (countrySelect.options.length > 1) {
-                countrySelect.remove(1);
-            }
+            // Clear all existing options
+            countrySelect.innerHTML = '';
 
             // Add country options
             sortedCountries.forEach(country => {
-                if (country && country !== 'undefined') {
+                if (country && country !== 'undefined' && country !== 'Archive') {
                     const option = document.createElement('option');
                     option.value = country;
                     option.textContent = country;
@@ -326,15 +329,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // Restore the previously selected country if it still exists in the dropdown
+            // Add Archive as the last option if it exists
+            if (data.linkedInJobsByCountry && data.linkedInJobsByCountry['Archive']) {
+                const archiveOption = document.createElement('option');
+                archiveOption.value = 'Archive';
+                const count = data.linkedInJobsByCountry['Archive'].length;
+                archiveOption.textContent = `Archive (${count})`;
+                countrySelect.appendChild(archiveOption);
+            }
+
+            // If there's a previously selected country and it still exists in the dropdown, use it
             if (currentSelectedCountry) {
-                // Check if the previously selected country still exists in the dropdown
                 const optionExists = Array.from(countrySelect.options).some(option => option.value === currentSelectedCountry);
                 if (optionExists) {
                     countrySelect.value = currentSelectedCountry;
+                    return; // Exit early if we've set a valid previous selection
                 }
-                // If the country no longer exists, it will default to 'All Countries'
             }
+
+            // Otherwise, select the first country that's not Archive
+            const firstScrapedCountry = Array.from(countrySelect.options)
+                .find(option => option.value !== 'Archive');
+
+            if (firstScrapedCountry) {
+                countrySelect.value = firstScrapedCountry.value;
+            }
+            // If no options exist, the dropdown will be empty
         });
     }
 
@@ -371,10 +391,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Render job listings
             renderJobListings(jobs);
 
-            // Populate country dropdown if we have country data
-            if (data.countries && data.countries.length > 0) {
-                populateCountryDropdown();
-            }
+            // Always populate the country dropdown
+            populateCountryDropdown();
 
             // Call filterJobListings to ensure consistent behavior
             filterJobListings();
@@ -471,7 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Function to archive a single job (move to Archive country)
-    function archiveSingleJob(jobId, country, jobElement) {
+    function archiveSingleJob(jobId, country, jobElement) { // jobElement is kept for API compatibility
         // Don't archive if the job is already in Archive
         if (country === 'Archive') {
             alert('This job is already archived');
@@ -542,13 +560,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }, () => {
                 console.log(`Archived job ${jobId} from ${country} to Archive with reset details`);
 
-                // Remove the job element from the DOM if provided
-                if (jobElement && jobElement.parentNode) {
-                    jobElement.parentNode.removeChild(jobElement);
-                }
-
-                // Update the job count in the UI
-                updateJobCountDisplay(updatedAllJobs.length);
+                // Instead of just removing the job element, refresh the job listings
+                // to ensure the UI is properly updated
+                filterJobListings();
 
                 // Update the country dropdown with new job counts
                 populateCountryDropdown();
@@ -692,25 +706,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Function to update the job count display
-    function updateJobCountDisplay(totalJobCount) {
-        const searchTerm = searchInput.value.toLowerCase();
-        const selectedCountry = countrySelect.value;
-        const showAppliedJobs = document.getElementById('filter-applied')?.checked;
-
-        let statusText = `${totalJobCount} jobs`;
-        if (selectedCountry && selectedCountry !== 'all') {
-            statusText += ` in ${selectedCountry}`;
-        }
-
-        if (!showAppliedJobs) {
-            statusText += " (not applied)";
-        }
-
-        if (searchTerm) {
-            statusText += ` (filtered by "${searchTerm}")`;
-        }
-
-        scrapeInfo.textContent = statusText;
+    function updateJobCountDisplay(totalJobCount) { // totalJobCount parameter kept for API compatibility
+        // Instead of updating the count directly, call filterJobListings to ensure consistent display
+        filterJobListings();
     }
 
     // Function to tailor CV with job description
@@ -1895,19 +1893,20 @@ document.addEventListener('DOMContentLoaded', () => {
             let totalJobCount = 0;
 
             if (data.linkedInJobsByCountry && Object.keys(data.linkedInJobsByCountry).length > 0) {
-                // If country is selected and not 'all', filter by country
-                if (selectedCountry && selectedCountry !== 'all') {
+                // Filter by the selected country
+                if (selectedCountry) {
                     allJobs = data.linkedInJobsByCountry[selectedCountry] || [];
-                } else {
-                    // If 'all' is selected, combine all countries except Archive
-                    Object.entries(data.linkedInJobsByCountry).forEach(([country, countryJobs]) => {
-                        if (country !== 'Archive') {
-                            allJobs = allJobs.concat(countryJobs);
-                        }
-                    });
+                } else if (countrySelect.options.length > 0) {
+                    // If no country is selected but options exist, use the first one
+                    const firstCountry = countrySelect.options[0].value;
+                    allJobs = data.linkedInJobsByCountry[firstCountry] || [];
+
+                    // Update the selected country in the dropdown
+                    countrySelect.value = firstCountry;
+                    selectedCountry = firstCountry;
                 }
 
-                // Calculate total job count across all countries (excluding Archive for 'all' selection)
+                // Calculate total job count across all countries (excluding Archive unless it's selected)
                 Object.entries(data.linkedInJobsByCountry).forEach(([country, countryJobs]) => {
                     // Only include Archive country in the count if it's specifically selected
                     if (country !== 'Archive' || selectedCountry === 'Archive') {
@@ -1945,10 +1944,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Update status text with filter information
             let statusText = `Showing ${appliedFilteredJobs.length} of ${totalJobCount} jobs`;
-            if (selectedCountry && selectedCountry !== 'all') {
+
+            // Add country information
+            if (selectedCountry) {
                 statusText += ` in ${selectedCountry}`;
-            } else {
-                statusText += ` (all countries except Archive)`;
             }
 
             // Add applied filter information

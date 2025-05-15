@@ -81,58 +81,54 @@ document.addEventListener('DOMContentLoaded', () => {
             scrapeButton.disabled = true;
             scrapeButton.textContent = 'Scraping in progress...';
 
-            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                const activeTab = tabs[0];
+            // Get job filters from storage
+            chrome.storage.sync.get({ jobFilters: [] }, (data) => {
+                const jobFilters = data.jobFilters;
 
-                if (!activeTab || !activeTab.id) {
-                    statusDisplay.textContent = 'Error: Could not find active tab.';
-                    console.error("Popup Error: No active tab found.");
+                if (!jobFilters || jobFilters.length === 0) {
+                    statusDisplay.textContent = 'Error: No job filters found. Please add filters in the settings.';
                     // Re-enable the button
                     scrapeButton.disabled = false;
                     scrapeButton.textContent = 'Scrape LinkedIn Jobs';
                     return;
                 }
 
-                // Check if we're on a LinkedIn jobs page
-                if (!activeTab.url.includes('linkedin.com/jobs')) {
-                    statusDisplay.textContent = 'Error: Not on a LinkedIn jobs page.';
-                    // Re-enable the button
-                    scrapeButton.disabled = false;
-                    scrapeButton.textContent = 'Scrape LinkedIn Jobs';
-                    return;
-                }
+                statusDisplay.textContent = 'Starting to scrape LinkedIn jobs... LinkedIn will open in a new tab.';
 
-
-                // First check if the script is already injected
-                chrome.tabs.sendMessage(activeTab.id, { action: "checkScraperLoaded" }, (response) => {
-                    if (chrome.runtime.lastError || !response) {
-                        // Script not loaded, inject it
-                        chrome.scripting.executeScript({
-                            target: { tabId: activeTab.id },
-                            files: ['job-scraper/linkedin-scraper.js']
-                        }).then(() => {
-                            sendScrapeMessage(activeTab.id, statusDisplay);
-                            // Re-enable the button after a delay to allow scraping to complete
-                            setTimeout(() => {
-                                scrapeButton.disabled = false;
-                                scrapeButton.textContent = 'Scrape LinkedIn Jobs';
-                            }, 3000);
-                        }).catch(err => {
-                            statusDisplay.textContent = 'Error: Could not inject scraper script.';
-                            console.error("Script injection error:", err);
-                            // Re-enable the button
-                            scrapeButton.disabled = false;
-                            scrapeButton.textContent = 'Scrape LinkedIn Jobs';
-                        });
-                    } else {
-                        // Script already loaded, just send the message
-                        sendScrapeMessage(activeTab.id, statusDisplay);
-                        // Re-enable the button after a delay to allow scraping to complete
-                        setTimeout(() => {
-                            scrapeButton.disabled = false;
-                            scrapeButton.textContent = 'Scrape LinkedIn Jobs';
-                        }, 3000);
+                // Send message to background script to start scraping
+                chrome.runtime.sendMessage({
+                    action: 'scrapeJobFiltersDirectly',
+                    filters: jobFilters
+                }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        statusDisplay.textContent = `Error: ${chrome.runtime.lastError.message}`;
+                        console.error('Error starting direct scraping:', chrome.runtime.lastError);
+                        // Re-enable the button
+                        scrapeButton.disabled = false;
+                        scrapeButton.textContent = 'Scrape LinkedIn Jobs';
+                        return;
                     }
+
+                    if (!response || !response.success) {
+                        statusDisplay.textContent = `Error: ${response?.error || 'Unknown error'}`;
+                        console.error('Failed to start direct scraping:', response?.error || 'Unknown error');
+                        // Re-enable the button
+                        scrapeButton.disabled = false;
+                        scrapeButton.textContent = 'Scrape LinkedIn Jobs';
+                        return;
+                    }
+
+                    // Success - update status
+                    if (response.warning) {
+                        statusDisplay.textContent = `Scraping completed with warnings: ${response.warning}`;
+                    } else {
+                        statusDisplay.textContent = 'Scraping completed. Check job listings for results.';
+                    }
+                    console.log('Direct scraping completed:', response.result);
+
+                    // Re-enable the button
+                    scrapeButton.disabled = false;
+                    scrapeButton.textContent = 'Scrape LinkedIn Jobs';
                 });
             });
         });

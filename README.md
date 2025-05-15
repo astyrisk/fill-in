@@ -14,10 +14,11 @@ The extension has two parts:
 - [x] connect it with the python script to tailor the cv
 - [x] tailor to handle multiple requests at the same time
 - [x] shows a notification when the resume is done
-- [ ] the extension scrapes jobs in the background
+- [x] the extension scrapes jobs in the background
+- [x] when you archive or apply a job, remove the pin
 - [ ] hightlight the word experience in the job description
+- [ ] api Input in settings page
 - [ ] when you click archive, the ui needs to updated correctly
-- [ ] when you archive or apply a job, remove the pin
 - [ ] myworkday support
 - [ ] option to tailor all the shown jobs 
 - [ ] two tabs: one for un-applied jobs and one for applied
@@ -26,18 +27,30 @@ The extension has two parts:
 - [ ] AI / 'Words' Filtering for jobs
 - [ ] support for companies' independent career sites
 
-
 ## Job Scraper
 
 ### Search Parameters
-- Job Type
+- Job Title
 - Location
 - Experience Level
 - Posting Date
 
-link to open and scrape from:
+link to open linkedin and scrape from:
 
-https://www.linkedin.com/jobs/search/?currentJobId=4210999460&distance=25&f_E=2%2C3&f_TPR=r604800&geoId=100288700&keywords=software%20engineer&origin=JOB_SEARCH_PAGE_JOB_FILTER&refresh=true
+https://www.linkedin.com/jobs/search/?f_E=2%2C3&f_TPR=r604800&keywords=software%20engineer&location=Poland
+
+Experience is a number: Internship -> 1, Entry Level -> 2 and so on f_E=2%2C3&
+localtion for location
+TPR for the showing jobs posted within the last week (604800 seconds). So, you would have to convert the times. f_TPR=r604800
+for title keywords=software%20engineer&
+
+### Errors
+- [] fix the following error
+Uncaught (in promise) Error: Could not establish connection. Receiving end does not exist.
+Context
+background.js
+Stack Trace
+background.js:0 (anonymous function)
 
 
 ## Form Filler

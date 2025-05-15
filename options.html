@@ -37,50 +37,50 @@
 
         body {
             font-family: Arial, sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
+            background-color: #f3f2ef;
+            color: #333333;
             line-height: 1.6;
             padding: 0;
             margin: 0;
-            width: 100%;
+        }
+
+        .container {
             max-width: 1000px;
             margin: 0 auto;
-        }
-
-        .header {
-            background-color: var(--card-color);
             padding: 20px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: var(--shadow-sm);
-            border-bottom: 1px solid var(--border-color);
         }
 
-        .header h1 {
-            font-size: 24px;
-            font-weight: 600;
+        h1 {
+            color: #0073b1;
             margin-bottom: 20px;
-            color: var(--primary-color);
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        #settings-info {
+            color: #666666;
+            margin-bottom: 15px;
+            font-size: 14px;
         }
 
         .tabs {
             display: flex;
-            border-bottom: 1px solid var(--border-color);
             margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
         }
 
         .tab {
-            padding: 10px 20px;
+            padding: 8px 16px;
             cursor: pointer;
             font-weight: 500;
-            color: var(--text-secondary);
+            color: #666666;
             position: relative;
-            transition: var(--transition);
+            transition: all 0.2s ease;
+            font-size: 14px;
         }
 
         .tab.active {
-            color: var(--primary-color);
+            color: #0073b1;
         }
 
         .tab.active::after {
@@ -90,21 +90,19 @@
             left: 0;
             width: 100%;
             height: 3px;
-            background-color: var(--primary-color);
+            background-color: #0073b1;
             border-radius: 3px 3px 0 0;
         }
 
         .tab:hover {
-            background-color: var(--hover-color);
+            background-color: #f1f3f4;
         }
 
         .tab i {
             margin-right: 8px;
         }
 
-        .content {
-            padding: 20px;
-        }
+        /* Content is now part of the container structure */
 
         .tab-content {
             display: none;
@@ -121,43 +119,43 @@
         }
 
         .card {
-            background-color: var(--card-color);
-            border-radius: var(--radius-md);
-            box-shadow: var(--shadow-sm);
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
             padding: 16px;
             margin-bottom: 16px;
-            transition: var(--transition);
+            transition: all 0.2s ease;
         }
 
         .card:hover {
-            box-shadow: var(--shadow-md);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
 
         h2 {
             font-size: 18px;
-            font-weight: 600;
+            font-weight: bold;
             margin-bottom: 15px;
-            color: var(--primary-color);
+            color: #0073b1;
             display: flex;
             align-items: center;
         }
 
         h2 i {
             margin-right: 10px;
-            color: var(--primary-color);
+            color: #0073b1;
         }
 
         h3 {
             font-size: 16px;
             font-weight: 500;
             margin: 20px 0 10px;
-            color: var(--text-color);
-            border-bottom: 1px solid var(--border-color);
+            color: #333333;
+            border-bottom: 1px solid #ddd;
             padding-bottom: 5px;
         }
 
         p {
-            color: var(--text-secondary);
+            color: #666666;
             margin-bottom: 15px;
             font-size: 14px;
         }
@@ -171,7 +169,7 @@
             margin-bottom: 6px;
             font-size: 14px;
             font-weight: 500;
-            color: var(--text-color);
+            color: #333333;
         }
 
         input[type="text"],
@@ -180,13 +178,13 @@
         select {
             width: 100%;
             padding: 8px 12px;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-sm);
+            border: 1px solid #ddd;
+            border-radius: 4px;
             font-family: Arial, sans-serif;
             font-size: 14px;
-            color: var(--text-color);
-            background-color: var(--card-color);
-            transition: var(--transition);
+            color: #333333;
+            background-color: white;
+            transition: all 0.2s ease;
         }
 
         input[type="text"]:focus,
@@ -194,13 +192,13 @@
         textarea:focus,
         select:focus {
             outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 2px var(--focus-color);
+            border-color: #0073b1;
+            box-shadow: 0 0 0 2px #e8f5fa;
         }
 
         input::placeholder,
         textarea::placeholder {
-            color: var(--text-secondary);
+            color: #666666;
             opacity: 0.7;
         }
 
@@ -224,7 +222,7 @@
             appearance: none;
             height: 6px;
             border-radius: 3px;
-            background: var(--border-color);
+            background: #ddd;
             outline: none;
             margin: 15px 0;
         }
@@ -235,11 +233,11 @@
             width: 20px;
             height: 20px;
             border-radius: 50%;
-            background: var(--primary-color);
+            background: #0073b1;
             cursor: pointer;
             border: none;
             box-shadow: 0 0 5px rgba(0,0,0,0.2);
-            transition: var(--transition);
+            transition: all 0.2s ease;
         }
 
         .range-slider::-webkit-slider-thumb:hover {
@@ -251,11 +249,11 @@
             width: 20px;
             height: 20px;
             border-radius: 50%;
-            background: var(--primary-color);
+            background: #0073b1;
             cursor: pointer;
             border: none;
             box-shadow: 0 0 5px rgba(0,0,0,0.2);
-            transition: var(--transition);
+            transition: all 0.2s ease;
         }
 
         .range-slider::-moz-range-thumb:hover {
@@ -268,13 +266,13 @@
             justify-content: space-between;
             width: 100%;
             font-size: 12px;
-            color: var(--text-secondary);
+            color: #666666;
             margin-top: 8px;
         }
 
         .slider-value {
             font-weight: 600;
-            color: var(--primary-color);
+            color: #0073b1;
             margin-left: 10px;
             font-size: 14px;
         }
@@ -290,14 +288,14 @@
         .tick {
             position: absolute;
             font-size: 11px;
-            color: var(--text-secondary);
+            color: #666666;
             transform: translateX(-50%);
             cursor: pointer;
-            transition: var(--transition);
+            transition: all 0.2s ease;
         }
 
         .tick:hover {
-            color: var(--primary-color);
+            color: #0073b1;
             transform: translateX(-50%) scale(1.1);
         }
 
@@ -306,23 +304,23 @@
             position: absolute;
             width: 1px;
             height: 5px;
-            background: var(--border-color);
+            background: #ddd;
             top: -10px;
             left: 50%;
-            transition: var(--transition);
+            transition: all 0.2s ease;
         }
 
         .tick:hover::before {
-            background: var(--primary-color);
+            background: #0073b1;
             height: 7px;
         }
 
         kbd {
-            background-color: var(--hover-color);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-sm);
+            background-color: #f1f3f4;
+            border: 1px solid #ddd;
+            border-radius: 4px;
             box-shadow: 0 1px 0 rgba(0,0,0,0.1);
-            color: var(--text-color);
+            color: #333333;
             display: inline-block;
             font-size: 0.85em;
             font-weight: 500;
@@ -338,24 +336,26 @@
             position: sticky;
             bottom: 20px;
             z-index: 10;
+            padding: 10px 0;
+            background-color: #f3f2ef;
         }
 
         button {
-            background-color: var(--primary-color);
+            background-color: #0073b1;
             color: white;
             border: none;
-            border-radius: var(--radius-sm);
+            border-radius: 4px;
             padding: 8px 16px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            transition: var(--transition);
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
         }
 
         button:hover {
-            background-color: var(--primary-dark);
+            background-color: #005582;
         }
 
         button i {
@@ -365,9 +365,9 @@
         #status {
             margin-left: 15px;
             padding: 8px 15px;
-            color: var(--success-color);
+            color: #27ae60;
             background-color: rgba(39, 174, 96, 0.1);
-            border-radius: var(--radius-sm);
+            border-radius: 4px;
             font-size: 14px;
             font-weight: 500;
             display: none;
@@ -391,16 +391,16 @@
         }
 
         .tip {
-            background-color: var(--primary-light);
-            border-left: 4px solid var(--primary-color);
+            background-color: #e8f5fa;
+            border-left: 4px solid #0073b1;
             padding: 10px 15px;
             margin-bottom: 20px;
-            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            border-radius: 0 4px 4px 0;
         }
 
         .tip p {
             margin-bottom: 0;
-            color: var(--text-color);
+            color: #333333;
             font-size: 14px;
         }
 
@@ -410,17 +410,17 @@
         }
 
         .filter-card {
-            background-color: var(--card-color);
-            border-radius: var(--radius-md);
+            background-color: white;
+            border-radius: 8px;
             padding: 16px;
             margin-bottom: 16px;
-            box-shadow: var(--shadow-sm);
-            transition: var(--transition);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
             position: relative;
         }
 
         .filter-card:hover {
-            box-shadow: var(--shadow-md);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
 
         .filter-header {
@@ -431,9 +431,9 @@
         }
 
         .filter-name {
-            font-weight: 600;
+            font-weight: bold;
             font-size: 16px;
-            color: var(--primary-color);
+            color: #0073b1;
             margin: 0;
         }
 
@@ -445,23 +445,23 @@
         .filter-action-btn {
             background: none;
             border: none;
-            color: var(--text-secondary);
+            color: #666666;
             cursor: pointer;
             padding: 5px;
-            border-radius: var(--radius-sm);
-            transition: var(--transition);
+            border-radius: 4px;
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
         .filter-action-btn:hover {
-            background-color: var(--hover-color);
-            color: var(--primary-color);
+            background-color: #f1f3f4;
+            color: #0073b1;
         }
 
         .filter-action-btn.delete:hover {
-            color: var(--error-color);
+            color: #e74c3c;
         }
 
         .filter-details {
@@ -478,39 +478,39 @@
 
         .filter-detail-label {
             font-size: 12px;
-            color: var(--text-secondary);
+            color: #666666;
             margin-bottom: 2px;
         }
 
         .filter-detail-value {
             font-size: 14px;
-            color: var(--text-color);
+            color: #333333;
         }
 
         .empty-state {
             text-align: center;
             padding: 40px 20px;
-            color: var(--text-secondary);
+            color: #666666;
         }
 
         .empty-icon {
             font-size: 48px;
             margin-bottom: 15px;
-            color: var(--border-color);
+            color: #ddd;
         }
 
         .empty-state h3 {
             margin-bottom: 10px;
-            color: var(--text-color);
+            color: #333333;
             border: none;
         }
 
         .filter-form {
-            background-color: var(--primary-light);
-            border-radius: var(--radius-md);
+            background-color: #e8f5fa;
+            border-radius: 8px;
             padding: 16px;
             margin: 16px 0;
-            border-left: 4px solid var(--primary-color);
+            border-left: 4px solid #0073b1;
         }
 
         .form-actions {
@@ -521,15 +521,15 @@
         }
 
         .button-primary {
-            background-color: var(--primary-color);
+            background-color: #0073b1;
             color: white;
             border: none;
-            border-radius: var(--radius-sm);
+            border-radius: 4px;
             padding: 8px 16px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            transition: var(--transition);
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
         }
@@ -539,19 +539,19 @@
         }
 
         .button-primary:hover {
-            background-color: var(--primary-dark);
+            background-color: #005582;
         }
 
         .button-secondary {
-            background-color: var(--hover-color);
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-sm);
+            background-color: #f1f3f4;
+            color: #333333;
+            border: 1px solid #ddd;
+            border-radius: 4px;
             padding: 8px 16px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            transition: var(--transition);
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
         }
@@ -561,7 +561,7 @@
         }
 
         .button-secondary:hover {
-            background-color: var(--border-color);
+            background-color: #ddd;
         }
 
         .add-filter-button {
@@ -585,16 +585,16 @@
         .checkbox-item {
             display: flex;
             align-items: center;
-            background-color: var(--hover-color);
-            border-radius: var(--radius-sm);
+            background-color: #f1f3f4;
+            border-radius: 4px;
             padding: 3px 6px;
-            transition: var(--transition);
+            transition: all 0.2s ease;
             cursor: pointer;
             flex-shrink: 0;
         }
 
         .checkbox-item:hover {
-            background-color: var(--border-color);
+            background-color: #ddd;
         }
 
         .checkbox-item input[type="checkbox"] {
@@ -612,9 +612,9 @@
 
         .experience-level-tag {
             display: inline-block;
-            background-color: var(--primary-light);
-            color: var(--primary-dark);
-            border-radius: var(--radius-sm);
+            background-color: #e8f5fa;
+            color: #005582;
+            border-radius: 4px;
             padding: 2px 6px;
             margin-right: 4px;
             margin-bottom: 4px;
@@ -623,27 +623,73 @@
         }
 
         .required {
-            color: var(--error-color);
+            color: #e74c3c;
             margin-left: 3px;
             font-weight: bold;
         }
 
-        @media (max-width: 600px) {
-            .header {
-                padding: 15px;
-            }
+        /* Filter scraping status styles */
+        .filter-scraping-status {
+            margin-top: 10px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
 
-            .content {
+        .filter-scraping-status i {
+            margin-right: 8px;
+        }
+
+        .filter-scraping-status.pending {
+            background-color: #f8f9fa;
+            color: #6c757d;
+            border-left: 3px solid #6c757d;
+        }
+
+        .filter-scraping-status.processing {
+            background-color: #e8f5fa;
+            color: #0073b1;
+            border-left: 3px solid #0073b1;
+        }
+
+        .filter-scraping-status.completed {
+            background-color: #e8f8f5;
+            color: #27ae60;
+            border-left: 3px solid #27ae60;
+        }
+
+        .filter-scraping-status.failed {
+            background-color: #fdf3f2;
+            color: #e74c3c;
+            border-left: 3px solid #e74c3c;
+        }
+
+        .filter-actions-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            gap: 10px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
                 padding: 15px;
             }
 
             .tab {
-                padding: 8px 12px;
+                padding: 6px 10px;
                 font-size: 13px;
             }
 
             .tab i {
                 margin-right: 5px;
+            }
+
+            h1 {
+                font-size: 22px;
             }
 
             h2 {
@@ -661,8 +707,9 @@
     </style>
 </head>
 <body>
-    <div class="header">
+    <div class="container">
         <h1>Extension Settings</h1>
+        <p id="settings-info">Configure your extension settings</p>
         <div class="tabs">
             <div class="tab active" data-tab="job-scraper">
                 <i class="fas fa-search"></i> Job Scraper
@@ -674,9 +721,8 @@
                 <i class="fas fa-briefcase"></i> Employment
             </div>
         </div>
-    </div>
 
-    <div class="content">
+        <div class="content">
         <!-- Job Scraper Tab Content -->
         <div id="job-scraper" class="tab-content active">
             <div class="card">
@@ -697,12 +743,12 @@
                     <h3><i class="fas fa-plus-circle"></i> <span id="filter-form-title">Add New Filter</span></h3>
 
                     <div class="tip">
-                        <p><i class="fas fa-info-circle"></i> Each job filter must be unique. You cannot create multiple filters with the same Job Type, Location, and Experience Levels.</p>
+                        <p><i class="fas fa-info-circle"></i> Each job filter must be unique. You cannot create multiple filters with the same Job Title, Location, and Experience Levels.</p>
                     </div>
 
 
                     <div class="form-group">
-                        <label for="filter-job-type">Job Type: <span class="required">*</span></label>
+                        <label for="filter-job-type">Job Title: <span class="required">*</span></label>
                         <input type="text" id="filter-job-type" placeholder="e.g., Software Engineer, Data Scientist" required>
                     </div>
 
@@ -768,7 +814,7 @@
                     </div>
                 </div>
 
-                <div class="add-filter-button">
+                <div class="filter-actions-container">
                     <button type="button" id="add-filter" class="button-primary"><i class="fas fa-plus"></i> Add New Job Filter</button>
                 </div>
             </div>
@@ -928,11 +974,12 @@
                 </div>
             </div>
         </div>
-    </div>
+        </div>
 
-    <div class="button-container">
-        <button id="save"><i class="fas fa-save"></i> Save Settings</button>
-        <div id="status"><i class="fas fa-check-circle"></i> Settings saved successfully!</div>
+        <div class="button-container">
+            <button id="save"><i class="fas fa-save"></i> Save Settings</button>
+            <div id="status"><i class="fas fa-check-circle"></i> Settings saved successfully!</div>
+        </div>
     </div>
 
     <script src="options.js"></script>

@@ -118,9 +118,14 @@ async function scrollToBottom() {
     return { success: true, jobCardSelector };
 }
 
-// Function to get the selected country from the location input field
-function getSelectedCountry() {
-    // Try to find the location input field using the selector from country.html
+// Function to get the selected country from the location input field or filter
+function getSelectedCountry(filter = null) {
+    // If a filter is provided, use its location
+    if (filter && filter.location) {
+        return filter.location.trim();
+    }
+
+    // Otherwise, try to find the location input field using the selector from country.html
     const locationInput = document.querySelector('#jobs-search-box-location-id-ember31') ||
                          document.querySelector('.jobs-search-box__text-input[aria-label="City, state, or zip code"]') ||
                          document.querySelector('input[aria-label*="location"]') ||
@@ -135,7 +140,7 @@ function getSelectedCountry() {
 }
 
 // Function to scrape job listings from the current page
-async function scrapeCurrentPage(jobCardSelector) {
+async function scrapeCurrentPage(jobCardSelector, filter = null) {
     try {
         // Find all job cards on the page using the determined selector
         const jobCards = document.querySelectorAll(jobCardSelector);
@@ -187,8 +192,8 @@ async function scrapeCurrentPage(jobCardSelector) {
             const locationElement = card.querySelector('.job-card-container__metadata-wrapper li');
             const location = locationElement ? locationElement.textContent.trim() : 'Unknown Location';
 
-            // Use the selected country from the location input field for all jobs
-            const country = getSelectedCountry();
+            // Use the selected country from the filter or location input field for all jobs
+            const country = getSelectedCountry(filter);
 
             // Get job URL - use the same titleElement from above to get the URL
             const jobUrl = titleElement && titleElement.href ? titleElement.href : '';
@@ -239,14 +244,19 @@ async function scrapeCurrentPage(jobCardSelector) {
                                      job.company && job.company !== 'Unknown Company' &&
                                      job.jobId;
 
+            // Silently filter out jobs with missing essential data
             if (!hasEssentialData) {
-                console.warn('Filtering out job with missing essential data:', job);
+                // Don't log anything to avoid console warnings
             }
 
             return hasEssentialData;
         });
 
-        console.log(`Filtered out ${extractedJobs.length - validJobs.length} jobs with missing essential data`);
+        // Silently filter out jobs with missing data
+        const filteredCount = extractedJobs.length - validJobs.length;
+        if (filteredCount > 0) {
+            console.log(`Processed ${extractedJobs.length} jobs, using ${validJobs.length} valid entries`);
+        }
         return validJobs;
     } catch (error) {
         console.error("Error scraping current page:", error);
@@ -319,7 +329,7 @@ async function clickNextPageButton() {
 }
 
 // Function to navigate through all pages and scrape job listings
-async function navigateAndScrapeAllPages(jobCardSelector) {
+async function navigateAndScrapeAllPages(jobCardSelector, filter = null) {
     let allJobListings = [];
     let currentPage = 1;
     const maxPages = 20; // Limit to prevent infinite loops
@@ -327,7 +337,7 @@ async function navigateAndScrapeAllPages(jobCardSelector) {
     console.log(`Starting to scrape page ${currentPage}...`);
 
     // Scrape the first page
-    const firstPageJobs = await scrapeCurrentPage(jobCardSelector);
+    const firstPageJobs = await scrapeCurrentPage(jobCardSelector, filter);
     allJobListings = [...firstPageJobs];
 
     console.log(`Scraped ${firstPageJobs.length} jobs from page ${currentPage}`);
@@ -350,7 +360,7 @@ async function navigateAndScrapeAllPages(jobCardSelector) {
 
         // Scrape the current page
         console.log(`Scraping page ${currentPage}...`);
-        const pageJobs = await scrapeCurrentPage(jobCardSelector);
+        const pageJobs = await scrapeCurrentPage(jobCardSelector, filter);
 
         if (pageJobs.length === 0) {
             console.log(`No jobs found on page ${currentPage}, might be an error. Stopping pagination.`);
@@ -466,11 +476,11 @@ async function checkIfJobExists(jobId, country) {
 }
 
 // Main function to scrape LinkedIn jobs
-async function scrapeLinkedInJobs() {
+async function scrapeLinkedInJobs(filter = null) {
     console.log("Starting LinkedIn jobs scraping");
 
     // Log the selected country at the start of scraping
-    const selectedCountry = getSelectedCountry();
+    const selectedCountry = getSelectedCountry(filter);
     console.log(`Using selected country: ${selectedCountry}`);
 
     // Check if we're on a LinkedIn jobs page
@@ -493,7 +503,7 @@ async function scrapeLinkedInJobs() {
         console.log(`Using job card selector for scraping: ${jobCardSelector}`);
 
         // Navigate through all pages and scrape job listings
-        const allJobListings = await navigateAndScrapeAllPages(jobCardSelector);
+        const allJobListings = await navigateAndScrapeAllPages(jobCardSelector, filter);
 
         if (allJobListings.length === 0) {
             console.warn("No job listings found across all pages");
@@ -614,12 +624,12 @@ async function scrapeLinkedInJobs() {
     }
 }
 
-// Listen for messages from popup
+// Listen for messages from popup or background script
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     if (request.action === "scrapeLinkedInJobs") {
         console.log("Received scrape request");
         // Use async/await pattern with Promise to handle the async scraping function
-        scrapeLinkedInJobs().then(result => {
+        scrapeLinkedInJobs(request.filter).then(result => {
             sendResponse(result);
         }).catch(error => {
             console.error("Error during scraping:", error);

@@ -1,6 +1,7 @@
 // Global variables
 let jobFilters = [];
 let currentEditingFilterId = null;
+let isScrapingFilters = false;
 
 // Saves options to chrome.storage.sync
 function saveOptions() {
@@ -201,7 +202,7 @@ function renderJobFilters() {
       </div>
       <div class="filter-details">
         <div class="filter-detail">
-          <span class="filter-detail-label">Job Type</span>
+          <span class="filter-detail-label">Job Title</span>
           <span class="filter-detail-value">${filter.jobType || 'Any'}</span>
         </div>
         <div class="filter-detail">
@@ -371,7 +372,7 @@ function saveFilter() {
   // Validate required fields
   let errorMessage = '';
   if (!jobType) {
-    errorMessage += 'Job Type is required.\n';
+    errorMessage += 'Job Title is required.\n';
   }
   if (!location) {
     errorMessage += 'Location is required.\n';
@@ -382,7 +383,7 @@ function saveFilter() {
 
   // Check for duplicate filter
   if (isDuplicateFilter(jobType, location, experienceLevels, currentEditingFilterId)) {
-    errorMessage += 'A filter with the same Job Type, Location, and Experience Levels already exists.\n';
+    errorMessage += 'A filter with the same Job Title, Location, and Experience Levels already exists.\n';
   }
 
   // Show error message if validation fails
@@ -531,6 +532,115 @@ function setupTabs() {
   });
 }
 
+// Function to scrape job filters directly using LinkedIn URLs
+function scrapeJobFiltersDirectly() {
+  if (jobFilters.length === 0) {
+    alert('No job filters to scrape. Please add at least one filter first.');
+    return;
+  }
+
+  if (isScrapingFilters) {
+    alert('Already scraping job filters. Please wait for the current scraping to complete.');
+    return;
+  }
+
+  // Confirm with the user
+  if (!confirm(`This will scrape LinkedIn jobs for ${jobFilters.length} filters without opening LinkedIn in your browser. Continue?`)) {
+    return;
+  }
+
+  // Set scraping state
+  isScrapingFilters = true;
+
+  // Update UI to show scraping status
+  jobFilters.forEach(filter => {
+    updateFilterScrapingStatus(filter.id, 'pending');
+  });
+
+  // Send message to background script to start scraping
+  chrome.runtime.sendMessage({
+    action: 'scrapeJobFiltersDirectly',
+    filters: jobFilters
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.error('Error starting direct scraping:', chrome.runtime.lastError);
+      alert(`Error starting scraping: ${chrome.runtime.lastError.message}`);
+      isScrapingFilters = false;
+      return;
+    }
+
+    if (!response || !response.success) {
+      console.error('Failed to start direct scraping:', response?.error || 'Unknown error');
+      alert(`Failed to start scraping: ${response?.error || 'Unknown error'}`);
+      isScrapingFilters = false;
+      return;
+    }
+
+    console.log('Direct scraping started successfully');
+  });
+}
+
+// Function to update the scraping status UI for a filter
+function updateFilterScrapingStatus(filterId, status, error = null) {
+  const filterCard = document.querySelector(`.filter-card[data-id="${filterId}"]`);
+  if (!filterCard) return;
+
+  // Find or create the status element
+  let statusEl = filterCard.querySelector('.filter-scraping-status');
+  if (!statusEl) {
+    statusEl = document.createElement('div');
+    statusEl.className = 'filter-scraping-status';
+    filterCard.appendChild(statusEl);
+  }
+
+  // Update the status display
+  switch (status) {
+    case 'pending':
+      statusEl.innerHTML = '<i class="fas fa-clock"></i> Pending';
+      statusEl.className = 'filter-scraping-status pending';
+      break;
+    case 'processing':
+      statusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scraping...';
+      statusEl.className = 'filter-scraping-status processing';
+      break;
+    case 'completed':
+      statusEl.innerHTML = '<i class="fas fa-check-circle"></i> Completed';
+      statusEl.className = 'filter-scraping-status completed';
+      // Auto-hide after a delay
+      setTimeout(() => {
+        statusEl.style.opacity = '0';
+        setTimeout(() => {
+          statusEl.remove();
+        }, 1000);
+      }, 5000);
+      break;
+    case 'failed':
+      statusEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> Failed${error ? `: ${error}` : ''}`;
+      statusEl.className = 'filter-scraping-status failed';
+      break;
+    default:
+      statusEl.remove();
+  }
+
+  // If all filters are completed or failed, reset the scraping state
+  if (status === 'completed' || status === 'failed') {
+    const pendingOrProcessingFilters = document.querySelectorAll('.filter-scraping-status.pending, .filter-scraping-status.processing');
+    if (pendingOrProcessingFilters.length === 0) {
+      isScrapingFilters = false;
+    }
+  }
+}
+
+// Listen for filter scraping status updates from background script
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'filterScrapingStatusUpdate') {
+    const { filterId, status, error } = request;
+    updateFilterScrapingStatus(filterId, status, error);
+    sendResponse({ success: true });
+    return true;
+  }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
   restoreOptions();
   setupFilterFormSlider();
@@ -540,6 +650,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('add-filter').addEventListener('click', addFilter);
   document.getElementById('save-filter').addEventListener('click', saveFilter);
   document.getElementById('cancel-filter').addEventListener('click', cancelFilter);
+
+  // Add event listener for scrape button
+  const scrapeButton = document.getElementById('scrape-filters');
+  if (scrapeButton) {
+    scrapeButton.addEventListener('click', scrapeJobFiltersDirectly);
+  }
 });
 
 document.getElementById('save').addEventListener('click', saveOptions);

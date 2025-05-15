@@ -12,7 +12,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["job-scraper/job-details-scraper.js", "job-scraper/job-listings.html", "job-scraper/job-listings.css", "job-scraper/job-listings.js"],
+      "resources": ["job-scraper/job-details-scraper.js", "job-scraper/job-listings.html", "job-scraper/job-listings.css", "job-scraper/job-listings.js", "job-scraper/direct-url-scraper.js", "job-scraper/linkedin-scraper.js"],
       "matches": ["<all_urls>"]
     }
   ],
@@ -20,7 +20,8 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
