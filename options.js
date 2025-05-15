@@ -32,6 +32,15 @@ function saveOptions() {
   const englishFluency = document.getElementById('englishFluency').value;
   const relatedToAnyone = document.getElementById('relatedToAnyone').value;
 
+  // Highlight settings
+  const highlightWords = document.getElementById('highlight-words').value;
+
+  // Exclusion settings
+  const excludeTitleWords = document.getElementById('exclude-title-words').value;
+
+  // Tailor settings
+  const openrouterApiKey = document.getElementById('openrouterApiKey').value;
+
   chrome.storage.sync.set(
     {
       userData: {
@@ -58,7 +67,12 @@ function saveOptions() {
         englishFluency: englishFluency,
         relatedToAnyone: relatedToAnyone
       },
-      jobFilters: jobFilters
+      jobFilters: jobFilters,
+      highlightWords: highlightWords,
+      excludeTitleWords: excludeTitleWords,
+      tailorSettings: {
+        openrouterApiKey: openrouterApiKey
+      }
     },
     () => {
       // Update status to let user know options were saved.
@@ -80,7 +94,12 @@ function restoreOptions() {
   chrome.storage.sync.get(
     {
       userData: {},
-      jobFilters: []
+      jobFilters: [],
+      highlightWords: 'experience,',
+      excludeTitleWords: '',
+      tailorSettings: {
+        openrouterApiKey: ''
+      }
     },
     (items) => {
       if (items.userData) {
@@ -116,6 +135,17 @@ function restoreOptions() {
       if (items.jobFilters && Array.isArray(items.jobFilters)) {
         jobFilters = items.jobFilters;
         renderJobFilters();
+      }
+
+      // Restore highlight words
+      document.getElementById('highlight-words').value = items.highlightWords;
+
+      // Restore exclude title words
+      document.getElementById('exclude-title-words').value = items.excludeTitleWords;
+
+      // Restore tailor settings
+      if (items.tailorSettings) {
+        document.getElementById('openrouterApiKey').value = items.tailorSettings.openrouterApiKey || '';
       }
     }
   );
@@ -641,6 +671,56 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+// Function to test the OpenRouter API key
+function testApiKey() {
+  const apiKey = document.getElementById('openrouterApiKey').value.trim();
+  const statusElement = document.getElementById('api-key-status');
+
+  if (!apiKey) {
+    statusElement.innerHTML = '<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Please enter an API key</span>';
+    return;
+  }
+
+  statusElement.innerHTML = '<span style="color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Testing API key...</span>';
+
+  // Use the tailor service to test the API key
+  fetch('http://localhost:5000/test-api-key', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      api_key: apiKey
+    })
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`Server returned status ${response.status}`);
+    }
+    return response.json();
+  })
+  .then(data => {
+    if (data.success) {
+      if (data.has_deepseek) {
+        statusElement.innerHTML = '<span style="color: var(--success-color);"><i class="fas fa-check-circle"></i> API key is valid and DeepSeek model is available</span>';
+      } else {
+        statusElement.innerHTML = '<span style="color: var(--warning-color);"><i class="fas fa-exclamation-circle"></i> API key is valid but DeepSeek model not found</span>';
+      }
+    } else {
+      throw new Error(data.message || 'Unknown error');
+    }
+  })
+  .catch(error => {
+    console.error('Error testing API key:', error);
+    statusElement.innerHTML = `<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Error: ${error.message}</span>`;
+
+    // Check if the error might be related to the tailor service not running
+    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+      statusElement.innerHTML += '<br><span style="color: var(--error-color);">Make sure the tailor service is running at http://localhost:5000</span>';
+    }
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   restoreOptions();
   setupFilterFormSlider();
@@ -655,6 +735,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const scrapeButton = document.getElementById('scrape-filters');
   if (scrapeButton) {
     scrapeButton.addEventListener('click', scrapeJobFiltersDirectly);
+  }
+
+  // Add event listener for API key testing
+  const testApiKeyButton = document.getElementById('test-api-key');
+  if (testApiKeyButton) {
+    testApiKeyButton.addEventListener('click', testApiKey);
   }
 });
 

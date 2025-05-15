@@ -12,24 +12,35 @@
         <h1>LinkedIn Job Listings</h1>
         <p id="scrape-info">Loading job listings...</p>
 
-        <div class="filters">
-            <input type="text" id="search-input" placeholder="Search jobs...">
-            <div class="filter-options">
-                <label>
-                    <input type="checkbox" id="filter-applied"> Show Applied Jobs
-                </label>
-                <div class="country-filter">
-                    <label for="country-select">Country:</label>
-                    <select id="country-select">
-                        <!-- Country options will be populated dynamically -->
-                    </select>
-                </div>
+        <div class="tabs">
+            <div class="tab active" data-tab="unapplied-jobs">
+                <i class="fas fa-briefcase"></i> Un-applied Jobs
             </div>
-            <button id="delete-shown-jobs-button" class="delete-button">Delete Shown Jobs</button>
+            <div class="tab" data-tab="applied-jobs">
+                <i class="fas fa-check-circle"></i> Applied Jobs
+            </div>
+            <div class="tab" data-tab="archive-jobs">
+                <i class="fas fa-archive"></i> Archive
+            </div>
         </div>
 
-        <div id="job-listings-container">
-            <!-- Job listings will be inserted here -->
+        <div class="content">
+            <div class="filters">
+                <input type="text" id="search-input" placeholder="Search jobs...">
+                <div class="filter-options">
+                    <div class="country-filter">
+                        <label for="country-select">Country:</label>
+                        <select id="country-select">
+                            <!-- Country options will be populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+                <button id="delete-shown-jobs-button" class="delete-button">Delete Shown Jobs</button>
+            </div>
+
+            <div id="job-listings-container">
+                <!-- Job listings will be inserted here -->
+            </div>
         </div>
     </div>
 

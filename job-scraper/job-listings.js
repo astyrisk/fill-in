@@ -142,6 +142,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const deleteShownJobsButton = document.getElementById('delete-shown-jobs-button');
     const countrySelect = document.getElementById('country-select');
 
+    // Tab elements
+    const tabs = document.querySelectorAll('.tab');
+
     // Popup elements
     const popupOverlay = document.getElementById('popup-overlay');
     const jobDetailsPopup = document.getElementById('job-details-popup');
@@ -181,15 +184,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add event listeners
     searchInput.addEventListener('input', filterJobListings);
 
-    // Easy Apply filter removed
+    // Setup tab navigation
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
 
-    // Add event listener for Applied filter
-    const appliedFilter = document.getElementById('filter-applied');
-    if (appliedFilter) {
-        // Default is unchecked (only show non-applied jobs)
-        appliedFilter.checked = false;
-        appliedFilter.addEventListener('change', filterJobListings);
-    }
+            // Add active class to clicked tab
+            tab.classList.add('active');
+
+            // Filter job listings based on the active tab
+            filterJobListings();
+        });
+    });
 
     // Add event listener for country filter
     if (countrySelect) {
@@ -292,6 +299,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Save the currently selected country
         const currentSelectedCountry = countrySelect.value;
 
+        // Get the active tab
+        const activeTab = document.querySelector('.tab.active');
+        const activeTabId = activeTab ? activeTab.getAttribute('data-tab') : 'unapplied-jobs';
+
         chrome.storage.local.get(['countries', 'linkedInJobsByCountry'], (data) => {
             // Get countries from either the countries array or the keys of linkedInJobsByCountry
             let availableCountries = [];
@@ -306,6 +317,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // Filter countries based on active tab
+            if (activeTabId === 'archive-jobs') {
+                // For Archive tab, only show Archive country
+                availableCountries = availableCountries.filter(country => country === 'Archive');
+            } else {
+                // For other tabs, exclude Archive country
+                availableCountries = availableCountries.filter(country => country !== 'Archive');
+            }
+
             // Sort countries alphabetically
             const sortedCountries = [...availableCountries].sort();
 
@@ -314,7 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Add country options
             sortedCountries.forEach(country => {
-                if (country && country !== 'undefined' && country !== 'Archive') {
+                if (country && country !== 'undefined') {
                     const option = document.createElement('option');
                     option.value = country;
                     option.textContent = country;
@@ -329,15 +349,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // Add Archive as the last option if it exists
-            if (data.linkedInJobsByCountry && data.linkedInJobsByCountry['Archive']) {
-                const archiveOption = document.createElement('option');
-                archiveOption.value = 'Archive';
-                const count = data.linkedInJobsByCountry['Archive'].length;
-                archiveOption.textContent = `Archive (${count})`;
-                countrySelect.appendChild(archiveOption);
-            }
-
             // If there's a previously selected country and it still exists in the dropdown, use it
             if (currentSelectedCountry) {
                 const optionExists = Array.from(countrySelect.options).some(option => option.value === currentSelectedCountry);
@@ -347,12 +358,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // Otherwise, select the first country that's not Archive
-            const firstScrapedCountry = Array.from(countrySelect.options)
-                .find(option => option.value !== 'Archive');
-
-            if (firstScrapedCountry) {
-                countrySelect.value = firstScrapedCountry.value;
+            // Otherwise, select the first country in the dropdown if available
+            if (countrySelect.options.length > 0) {
+                countrySelect.value = countrySelect.options[0].value;
             }
             // If no options exist, the dropdown will be empty
         });
@@ -367,34 +375,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            let jobs = [];
-            let totalJobCount = 0;
-
-            // Use the new format if available, otherwise fall back to the old format
-            if (data.linkedInJobsByCountry && Object.keys(data.linkedInJobsByCountry).length > 0) {
-                // Filter out Archive jobs for initial load (consistent with 'All Countries' filter)
-                Object.entries(data.linkedInJobsByCountry).forEach(([country, countryJobs]) => {
-                    if (country !== 'Archive') {
-                        jobs = jobs.concat(countryJobs);
-                        totalJobCount += countryJobs.length;
-                    }
-                });
-            } else if (data.linkedInJobs) {
-                // Fall back to old format
-                jobs = data.linkedInJobs;
-                totalJobCount = jobs.length;
-            }
-
-            // Display job count
-            scrapeInfo.textContent = `Showing ${totalJobCount} jobs (all countries except Archive)`;
-
-            // Render job listings
-            renderJobListings(jobs);
-
             // Always populate the country dropdown
             populateCountryDropdown();
 
-            // Call filterJobListings to ensure consistent behavior
+            // Call filterJobListings to handle the job filtering based on the active tab
             filterJobListings();
         });
     }
@@ -711,6 +695,80 @@ document.addEventListener('DOMContentLoaded', () => {
         filterJobListings();
     }
 
+    // Cache for highlight words to avoid repeated storage lookups
+    let cachedHighlightWords = null;
+
+    // Function to highlight specified words in text
+    function highlightExperienceWord(text) {
+        if (!text) return text;
+
+        // If we already have the highlight words cached, use them immediately
+        if (cachedHighlightWords) {
+            return applyHighlighting(text, cachedHighlightWords);
+        }
+
+        // Otherwise, get them from storage and cache for future use
+        chrome.storage.sync.get({ highlightWords: 'experience,' }, (data) => {
+            // Cache the highlight words for future use
+            cachedHighlightWords = data.highlightWords;
+
+            // Find the description container
+            const descriptionContainer = document.getElementById('popup-description');
+            if (descriptionContainer && descriptionContainer.innerHTML === text) {
+                // Update the container with highlighted text
+                descriptionContainer.innerHTML = applyHighlighting(text, cachedHighlightWords);
+            }
+        });
+
+        // Return the original text for now (will be updated asynchronously if needed)
+        return text;
+    }
+
+    // Helper function to apply highlighting to text
+    function applyHighlighting(text, highlightWordsStr) {
+        // Split the comma-separated words and trim each one
+        const wordsToHighlight = highlightWordsStr.split(',')
+            .map(word => word.trim())
+            .filter(word => word.length > 0);
+
+        // Create a regex pattern for all words to highlight
+        if (wordsToHighlight.length > 0) {
+            try {
+                // Escape special regex characters in the words
+                const escapedWords = wordsToHighlight.map(word =>
+                    word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                );
+
+                const pattern = new RegExp('\\b(' + escapedWords.join('|') + ')\\b', 'gi');
+
+                // Replace all matching words with highlighted version
+                return text.replace(pattern, '<span class="highlight-experience">$1</span>');
+            } catch (error) {
+                console.error('Error creating highlight pattern:', error);
+                return text;
+            }
+        }
+
+        return text;
+    }
+
+    // Listen for changes to highlight words in storage
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+        if (namespace === 'sync' && changes.highlightWords) {
+            // Update the cached highlight words
+            cachedHighlightWords = changes.highlightWords.newValue;
+
+            // If a job description is currently displayed, update it with the new highlighting
+            const descriptionContainer = document.getElementById('popup-description');
+            if (descriptionContainer && currentJobForTailoring && currentJobForTailoring.description) {
+                descriptionContainer.innerHTML = applyHighlighting(
+                    currentJobForTailoring.description,
+                    cachedHighlightWords
+                );
+            }
+        }
+    });
+
     // Function to tailor CV with job description
     function tailorCV(jobDescription) {
         console.log('Tailoring CV with job description');
@@ -735,78 +793,108 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update the job status to queued
         updateJobTailoringStatus(jobId, country, 'queued');
 
-        // Send the job description to the tailor server
-        fetch('http://localhost:5000/tailor', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                job_description: jobDescription
-            })
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Server responded with status: ${response.status}`);
-            }
+        // First, check if we have a custom API key configured
+        chrome.storage.sync.get({ tailorSettings: { openrouterApiKey: '' } }, (data) => {
+            const apiKey = data.tailorSettings?.openrouterApiKey || '';
 
-            // Parse the JSON response
-            return response.json();
-        })
-        .then(data => {
-            if (data.error) {
-                throw new Error(data.error);
-            }
+            // If we have an API key, update the server configuration first
+            const updateConfigPromise = apiKey ?
+                fetch('http://localhost:5000/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        openrouter_api_key: apiKey
+                    })
+                }).then(response => {
+                    if (!response.ok) {
+                        console.warn('Failed to update tailor service API key, using default key');
+                    }
+                    return Promise.resolve(); // Continue regardless of success
+                }).catch(error => {
+                    console.warn('Error updating tailor service API key:', error);
+                    return Promise.resolve(); // Continue regardless of error
+                })
+                : Promise.resolve(); // No API key, just continue
 
-            if (data.success) {
-                // Update status with success message
-                tailorStatus.textContent = data.message || 'CV tailoring request has been queued';
-
-                // Store the request ID if provided
-                if (data.request_id) {
-                    console.log('Tailor request ID:', data.request_id);
-
-                    // Store the request ID with the job
-                    chrome.storage.local.get(['linkedInJobsByCountry'], (storageData) => {
-                        if (!storageData.linkedInJobsByCountry || !storageData.linkedInJobsByCountry[country]) return;
-
-                        const countryJobs = storageData.linkedInJobsByCountry[country];
-                        const jobIndex = countryJobs.findIndex(job => job.jobId === jobId);
-
-                        if (jobIndex === -1) return;
-
-                        // Update the job with the request ID
-                        countryJobs[jobIndex].tailorRequestId = data.request_id;
-
-                        // Save the updated data
-                        chrome.storage.local.set({
-                            linkedInJobsByCountry: storageData.linkedInJobsByCountry,
-                            linkedInJobs: Object.values(storageData.linkedInJobsByCountry).flat()
-                        });
+            // After updating the config (or immediately if no API key), send the job description
+            updateConfigPromise
+                .then(() => {
+                    // Send the job description to the tailor server
+                    return fetch('http://localhost:5000/tailor', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            job_description: jobDescription
+                        })
                     });
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Server responded with status: ${response.status}`);
+                    }
 
-                    // Start polling for status updates
-                    startPollingTailorStatus(jobId, country, data.request_id);
-                }
+                    // Parse the JSON response
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
 
-                // Re-enable the button after a delay
-                setTimeout(() => {
+                    if (data.success) {
+                        // Update status with success message
+                        tailorStatus.textContent = data.message || 'CV tailoring request has been queued';
+
+                        // Store the request ID if provided
+                        if (data.request_id) {
+                            console.log('Tailor request ID:', data.request_id);
+
+                            // Store the request ID with the job
+                            chrome.storage.local.get(['linkedInJobsByCountry'], (storageData) => {
+                                if (!storageData.linkedInJobsByCountry || !storageData.linkedInJobsByCountry[country]) return;
+
+                                const countryJobs = storageData.linkedInJobsByCountry[country];
+                                const jobIndex = countryJobs.findIndex(job => job.jobId === jobId);
+
+                                if (jobIndex === -1) return;
+
+                                // Update the job with the request ID
+                                countryJobs[jobIndex].tailorRequestId = data.request_id;
+
+                                // Save the updated data
+                                chrome.storage.local.set({
+                                    linkedInJobsByCountry: storageData.linkedInJobsByCountry,
+                                    linkedInJobs: Object.values(storageData.linkedInJobsByCountry).flat()
+                                });
+                            });
+
+                            // Start polling for status updates
+                            startPollingTailorStatus(jobId, country, data.request_id);
+                        }
+
+                        // Re-enable the button after a delay
+                        setTimeout(() => {
+                            tailorButton.disabled = false;
+                        }, 3000);
+                    } else {
+                        // Handle unexpected response format
+                        throw new Error('Unexpected response from server');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error tailoring CV:', error);
+                    tailorStatus.textContent = `Error: ${error.message}`;
+
+                    // Update the job status to failed
+                    updateJobTailoringStatus(jobId, country, 'failed');
+
+                    // Re-enable the button
                     tailorButton.disabled = false;
-                }, 3000);
-            } else {
-                // Handle unexpected response format
-                throw new Error('Unexpected response from server');
-            }
-        })
-        .catch(error => {
-            console.error('Error tailoring CV:', error);
-            tailorStatus.textContent = `Error: ${error.message}`;
-
-            // Update the job status to failed
-            updateJobTailoringStatus(jobId, country, 'failed');
-
-            // Re-enable the button
-            tailorButton.disabled = false;
+                });
         });
     }
 
@@ -1013,7 +1101,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Set job description if available
         const descriptionContainer = document.getElementById('popup-description');
         if (job.description) {
-            descriptionContainer.innerHTML = job.description;
+            // Apply highlighting to the job description
+            descriptionContainer.innerHTML = highlightExperienceWord(job.description);
         } else {
             // If we don't have the description yet, try to scrape it now (but not for archived jobs)
             if (job.country === 'Archive') {
@@ -1038,7 +1127,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         // Update the popup with the new details
                         if (job.description) {
-                            descriptionContainer.innerHTML = job.description;
+                            // Apply highlighting to the job description
+                            descriptionContainer.innerHTML = highlightExperienceWord(job.description);
 
                             // Enable the tailor CV button since we now have a job description
                             const tailorCvButton = document.getElementById('tailor-cv-button');
@@ -1337,6 +1427,178 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Function to categorize jobs by date
+    function categorizeJobsByDate(jobs) {
+        // Create categories
+        const categories = {
+            pinned: [],
+            past24Hours: [],
+            pastWeek: [],
+            pastMonth: [],
+            older: []
+        };
+
+        // Get current date for comparison
+        const now = new Date();
+
+        // 24 hours in milliseconds
+        const hours24 = 24 * 60 * 60 * 1000;
+
+        // 7 days in milliseconds
+        const week = 7 * 24 * 60 * 60 * 1000;
+
+        // 30 days in milliseconds
+        const month = 30 * 24 * 60 * 60 * 1000;
+
+        jobs.forEach(job => {
+            // First check if the job is pinned
+            if (job.isPinned) {
+                categories.pinned.push(job);
+                return; // Skip further categorization for pinned jobs
+            }
+
+            // Try to get the job date
+            let jobDate = null;
+
+            // First try to use convertedDate if available
+            if (job.convertedDate && job.convertedDate.isoDate) {
+                jobDate = new Date(job.convertedDate.isoDate);
+            }
+            // If not, try to parse from postingDate
+            else if (job.postingDate) {
+                // Try to extract a date from the posting date string
+                const dateMatch = job.postingDate.match(/(\d+)\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months)/i);
+                if (dateMatch) {
+                    const amount = parseInt(dateMatch[1]);
+                    const unit = dateMatch[2].toLowerCase();
+
+                    // Create a new date and subtract the appropriate amount
+                    jobDate = new Date();
+
+                    if (unit.includes('minute')) {
+                        jobDate.setMinutes(jobDate.getMinutes() - amount);
+                    } else if (unit.includes('hour')) {
+                        jobDate.setHours(jobDate.getHours() - amount);
+                    } else if (unit.includes('day')) {
+                        jobDate.setDate(jobDate.getDate() - amount);
+                    } else if (unit.includes('week')) {
+                        jobDate.setDate(jobDate.getDate() - (amount * 7));
+                    } else if (unit.includes('month')) {
+                        jobDate.setMonth(jobDate.getMonth() - amount);
+                    }
+                }
+            }
+
+            // If we couldn't determine a date, put in "older" category
+            if (!jobDate) {
+                categories.older.push(job);
+                return;
+            }
+
+            // Calculate time difference in milliseconds
+            const timeDiff = now.getTime() - jobDate.getTime();
+
+            // Categorize based on time difference
+            if (timeDiff <= hours24) {
+                categories.past24Hours.push(job);
+            } else if (timeDiff <= week) {
+                categories.pastWeek.push(job);
+            } else if (timeDiff <= month) {
+                categories.pastMonth.push(job);
+            } else {
+                categories.older.push(job);
+            }
+        });
+
+        return categories;
+    }
+
+    // Function to create a collapsible section for a date category
+    function createDateCategorySection(categoryName, jobs, defaultCollapsed = false) {
+        if (!jobs || jobs.length === 0) return '';
+
+        // Get the storage key for this category
+        const storageKey = `category_${categoryName}_collapsed`;
+
+        // Create section elements
+        const sectionDiv = document.createElement('div');
+        sectionDiv.className = 'date-category-section';
+
+        // Create header with appropriate class and text
+        const headerDiv = document.createElement('div');
+        headerDiv.className = `date-category-header ${categoryName.toLowerCase().replace(/\s+/g, '-')}`;
+
+        // Set header text based on category
+        let headerText;
+        switch(categoryName.toLowerCase()) {
+            case 'pinned':
+                headerText = 'Pinned Jobs';
+                break;
+            case 'past24hours':
+                headerText = 'Past 24 Hours';
+                break;
+            case 'pastweek':
+                headerText = 'Past Week';
+                break;
+            case 'pastmonth':
+                headerText = 'Past Month';
+                break;
+            case 'older':
+                headerText = 'Older Jobs';
+                break;
+            default:
+                headerText = categoryName;
+        }
+
+        // Create header content with job count
+        headerDiv.innerHTML = `
+            <div>
+                ${headerText} <span class="date-category-count">${jobs.length}</span>
+            </div>
+            <div class="toggle-icon">
+                <i class="fas fa-chevron-down"></i>
+            </div>
+        `;
+
+        // Create content container
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'date-category-content';
+
+        // Load saved state from storage
+        chrome.storage.local.get([storageKey], (data) => {
+            // If we have a saved state, use it; otherwise use the default
+            const isCollapsed = data[storageKey] !== undefined ? data[storageKey] : defaultCollapsed;
+
+            // Apply the collapsed state if needed
+            if (isCollapsed) {
+                headerDiv.classList.add('collapsed');
+                contentDiv.classList.add('collapsed');
+            }
+        });
+
+        // Add click event to toggle collapse/expand
+        headerDiv.addEventListener('click', () => {
+            const isCollapsed = !headerDiv.classList.contains('collapsed');
+            headerDiv.classList.toggle('collapsed');
+            contentDiv.classList.toggle('collapsed');
+
+            // Save the new state
+            const saveData = {};
+            saveData[storageKey] = isCollapsed;
+            chrome.storage.local.set(saveData, () => {
+                console.log(`Saved state for ${categoryName}: ${isCollapsed ? 'collapsed' : 'expanded'}`);
+            });
+        });
+
+        // Append header to section
+        sectionDiv.appendChild(headerDiv);
+
+        // Append content container to section
+        sectionDiv.appendChild(contentDiv);
+
+        return { sectionDiv, contentDiv };
+    }
+
     function renderJobListings(jobs) {
         jobListingsContainer.innerHTML = '';
 
@@ -1345,15 +1607,64 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Sort jobs to put pinned jobs at the top
-        const sortedJobs = [...jobs].sort((a, b) => {
-            // First sort by pinned status (pinned jobs first)
-            if (a.isPinned && !b.isPinned) return -1;
-            if (!a.isPinned && b.isPinned) return 1;
-            return 0;
-        });
+        // Categorize jobs by date
+        const categorizedJobs = categorizeJobsByDate(jobs);
 
-        sortedJobs.forEach(job => {
+        // Create sections for each category
+        const pinnedSection = createDateCategorySection('pinned', categorizedJobs.pinned);
+        const past24HoursSection = createDateCategorySection('past24Hours', categorizedJobs.past24Hours);
+        const pastWeekSection = createDateCategorySection('pastWeek', categorizedJobs.pastWeek);
+        const pastMonthSection = createDateCategorySection('pastMonth', categorizedJobs.pastMonth, true); // Collapsed by default
+        const olderSection = createDateCategorySection('older', categorizedJobs.older, true); // Collapsed by default
+
+        // Add sections to the container if they have jobs
+        if (pinnedSection && categorizedJobs.pinned.length > 0) {
+            jobListingsContainer.appendChild(pinnedSection.sectionDiv);
+        }
+
+        if (past24HoursSection && categorizedJobs.past24Hours.length > 0) {
+            jobListingsContainer.appendChild(past24HoursSection.sectionDiv);
+        }
+
+        if (pastWeekSection && categorizedJobs.pastWeek.length > 0) {
+            jobListingsContainer.appendChild(pastWeekSection.sectionDiv);
+        }
+
+        if (pastMonthSection && categorizedJobs.pastMonth.length > 0) {
+            jobListingsContainer.appendChild(pastMonthSection.sectionDiv);
+        }
+
+        if (olderSection && categorizedJobs.older.length > 0) {
+            jobListingsContainer.appendChild(olderSection.sectionDiv);
+        }
+
+        // Render jobs for each category
+        if (pinnedSection && categorizedJobs.pinned.length > 0) {
+            renderJobsInSection(categorizedJobs.pinned, pinnedSection.contentDiv);
+        }
+
+        if (past24HoursSection && categorizedJobs.past24Hours.length > 0) {
+            renderJobsInSection(categorizedJobs.past24Hours, past24HoursSection.contentDiv);
+        }
+
+        if (pastWeekSection && categorizedJobs.pastWeek.length > 0) {
+            renderJobsInSection(categorizedJobs.pastWeek, pastWeekSection.contentDiv);
+        }
+
+        if (pastMonthSection && categorizedJobs.pastMonth.length > 0) {
+            renderJobsInSection(categorizedJobs.pastMonth, pastMonthSection.contentDiv);
+        }
+
+        if (olderSection && categorizedJobs.older.length > 0) {
+            renderJobsInSection(categorizedJobs.older, olderSection.contentDiv);
+        }
+    }
+
+    // Function to render jobs in a section
+    function renderJobsInSection(jobs, container) {
+        if (!container || !jobs || jobs.length === 0) return;
+
+        jobs.forEach(job => {
             const jobCard = document.createElement('div');
             jobCard.className = job.isPinned ? 'job-card pinned' : 'job-card';
 
@@ -1432,7 +1743,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
 
-            jobListingsContainer.appendChild(jobCard);
+            container.appendChild(jobCard);
 
             // Get the View Job button we just added
             const viewJobBtn = jobCard.querySelector('.view-job-btn');
@@ -1887,23 +2198,38 @@ document.addEventListener('DOMContentLoaded', () => {
         const searchTerm = searchInput.value.toLowerCase();
         const selectedCountry = countrySelect.value;
 
+        // Get the active tab
+        const activeTab = document.querySelector('.tab.active');
+        const activeTabId = activeTab ? activeTab.getAttribute('data-tab') : 'unapplied-jobs';
+
         chrome.storage.local.get(['linkedInJobs', 'linkedInJobsByCountry'], (data) => {
             // Use the new format if available, otherwise fall back to the old format
             let allJobs = [];
             let totalJobCount = 0;
 
             if (data.linkedInJobsByCountry && Object.keys(data.linkedInJobsByCountry).length > 0) {
-                // Filter by the selected country
-                if (selectedCountry) {
-                    allJobs = data.linkedInJobsByCountry[selectedCountry] || [];
-                } else if (countrySelect.options.length > 0) {
-                    // If no country is selected but options exist, use the first one
-                    const firstCountry = countrySelect.options[0].value;
-                    allJobs = data.linkedInJobsByCountry[firstCountry] || [];
+                // Handle Archive tab separately
+                if (activeTabId === 'archive-jobs') {
+                    // For Archive tab, only show jobs from Archive country
+                    allJobs = data.linkedInJobsByCountry['Archive'] || [];
+                    totalJobCount = allJobs.length;
+                } else {
+                    // For other tabs, filter by the selected country (excluding Archive)
+                    if (selectedCountry && selectedCountry !== 'Archive') {
+                        allJobs = data.linkedInJobsByCountry[selectedCountry] || [];
+                    } else if (countrySelect.options.length > 0) {
+                        // If no country is selected but options exist, use the first one that's not Archive
+                        const firstCountry = Array.from(countrySelect.options)
+                            .find(option => option.value !== 'Archive')?.value;
 
-                    // Update the selected country in the dropdown
-                    countrySelect.value = firstCountry;
-                    selectedCountry = firstCountry;
+                        if (firstCountry) {
+                            allJobs = data.linkedInJobsByCountry[firstCountry] || [];
+
+                            // Update the selected country in the dropdown
+                            countrySelect.value = firstCountry;
+                            selectedCountry = firstCountry;
+                        }
+                    }
                 }
 
                 // Calculate total job count across all countries (excluding Archive unless it's selected)
@@ -1933,26 +2259,37 @@ document.addEventListener('DOMContentLoaded', () => {
                        (job.jobId && job.jobId.toLowerCase().includes(searchTerm));
             });
 
-            // By default, show only non-applied jobs
-            // If "Show Applied Jobs" is checked, include all jobs
-            const showAppliedJobs = document.getElementById('filter-applied')?.checked;
-            const appliedFilteredJobs = showAppliedJobs ?
-                filteredJobs :
-                filteredJobs.filter(job => !job.isApplied);
+            // Apply tab-specific filtering
+            let tabFilteredJobs = filteredJobs;
 
-            renderJobListings(appliedFilteredJobs);
+            if (activeTabId === 'unapplied-jobs') {
+                // Show only non-applied jobs
+                tabFilteredJobs = filteredJobs.filter(job => !job.isApplied);
+            } else if (activeTabId === 'applied-jobs') {
+                // Show only applied jobs
+                tabFilteredJobs = filteredJobs.filter(job => job.isApplied);
+            } else if (activeTabId === 'archive-jobs') {
+                // Show all jobs in Archive (already filtered by country above)
+                tabFilteredJobs = filteredJobs;
+            }
+
+            renderJobListings(tabFilteredJobs);
 
             // Update status text with filter information
-            let statusText = `Showing ${appliedFilteredJobs.length} of ${totalJobCount} jobs`;
+            let statusText = `Showing ${tabFilteredJobs.length} of ${totalJobCount} jobs`;
 
             // Add country information
             if (selectedCountry) {
                 statusText += ` in ${selectedCountry}`;
             }
 
-            // Add applied filter information
-            if (!showAppliedJobs) {
+            // Add tab information
+            if (activeTabId === 'unapplied-jobs') {
                 statusText += " (not applied)";
+            } else if (activeTabId === 'applied-jobs') {
+                statusText += " (applied)";
+            } else if (activeTabId === 'archive-jobs') {
+                statusText += " (archived)";
             }
 
             if (searchTerm) {

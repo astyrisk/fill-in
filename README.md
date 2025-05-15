@@ -1,89 +1,154 @@
 # Fill-in
-chromium-based (Manifest V3) extension to filter related jobs from linked-in and fill in your data. I am tired of those corperate shitty forms and mentally-unstable job descriptions. 
-
-The extension has two parts: 
-1. The form filler part, which fills in the form fields on the website you are on. 
-2. The job scraper part, which scrapes jobs from linkedin and shows them in a popup. It also tailors a CV for each job. 
-
 *This is a work in progress.*
 
-## TODO
-- [x] fix apply url
-- [x] implement PIN, UNPIN
-- [x] applied category for jobs
-- [x] connect it with the python script to tailor the cv
-- [x] tailor to handle multiple requests at the same time
-- [x] shows a notification when the resume is done
-- [x] the extension scrapes jobs in the background
-- [x] when you archive or apply a job, remove the pin
-- [ ] hightlight the word experience in the job description
-- [ ] api Input in settings page
-- [ ] when you click archive, the ui needs to updated correctly
-- [ ] myworkday support
-- [ ] option to tailor all the shown jobs 
-- [ ] two tabs: one for un-applied jobs and one for applied
-- [ ] for applied jobs and archive tabs: sort it with date labels: last day, last week: before last month, ...
-- [ ] fix the filling errors that appear in the console
-- [ ] AI / 'Words' Filtering for jobs
-- [ ] support for companies' independent career sites
 
-## Job Scraper
+A chrome extension (Manifest V3) to filter related jobs from linked-in and fill in your data. I am tired of those corperate shitty forms and mentally-unstable job descriptions. 
 
-### Search Parameters
-- Job Title
-- Location
-- Experience Level
-- Posting Date
+The extension has two main parts:
+1. The form filler part, which fills in the form fields on the website you are on.
+2. The job scraper part, which scrapes jobs from LinkedIn and shows them in a popup. It also tailors a CV for each job.
 
-link to open linkedin and scrape from:
+![Fill-in Logo](icons/icon128.png)
 
-https://www.linkedin.com/jobs/search/?f_E=2%2C3&f_TPR=r604800&keywords=software%20engineer&location=Poland
+## Features
 
-Experience is a number: Internship -> 1, Entry Level -> 2 and so on f_E=2%2C3&
-localtion for location
-TPR for the showing jobs posted within the last week (604800 seconds). So, you would have to convert the times. f_TPR=r604800
-for title keywords=software%20engineer&
+### Job Scraper
+Automatically scrapes job listings from LinkedIn based on your preferences:
 
-### Errors
-- [] fix the following error
-Uncaught (in promise) Error: Could not establish connection. Receiving end does not exist.
-Context
-background.js
-Stack Trace
-background.js:0 (anonymous function)
+- **Customizable Search Filters**: Set job title, location, experience level, and posting date
+- **Multiple Job Filters**: Create and manage different search configurations
+- **Background Scraping**: Runs in the background without requiring LinkedIn to be open
+- **Job Organization**: Sort jobs by date with fold/unfold functionality
+- **Job Management**: Pin important listings, mark jobs as applied, or archive them
+- **Highlighted Keywords**: Easily spot important terms like "experience" in job descriptions
+- **Word Filtering**: Filter out job titles containing specific words
 
+LinkedIn search parameters are automatically constructed:
+- Experience level is mapped to numbers (Internship -> 1, Entry Level -> 2, etc.) using `f_E=2%2C3`
+- Posting date is converted to seconds (e.g., past week = 604800 seconds) using `f_TPR=r604800`
+- Job title is encoded in the URL as `keywords=software%20engineer`
+- Location is included as `location=Poland`
 
-## Form Filler
-### Supported Fields
-- First Name, Last Name, Email, Phone, City, State, Country/Current location, Zip Code, LinkedIn URL, GitHub URL, Portfolio URL, work authorization status, salary expectations, current notice period, available to start, address.
+### CV Tailoring
+Automatically tailors your CV for each job application:
 
-### works on the following
-- https://jobs.lever.co/instructure/8218b205-0c5c-4cc7-99a6-6ba4befec9ab/apply?source=LinkedIn
-- https://careers.zenitech.co.uk/jobs/5454808-java-software-engineer/applications/new
+- **AI-Powered**: Uses DeepSeek V3 API to customize your CV based on job descriptions
+- **Status Tracking**: Monitor the tailoring process for each job listing
+- **Multiple Requests**: Handles multiple tailoring requests simultaneously
 
+### Form Filler
+Automatically fills in job application forms with your information:
 
-### It breaks on the following
-- https://www.opswat.com/jobs/4535955005?gh_jid=4535955005#application-form
-- https://jobs.jobvite.com/ef-education-first/job/oOLQvfwE/apply?nl=1
-- https://avisbudget.wd1.myworkdayjobs.com/en-US/ABG_Careers/job/Budapest-Service-Centre/Automation-Developer_R0174498?src=LinkedIn
-- https://www.avisbudgetgroup.jobs/automation-developer/job/PAF-ABG-F95C890E-C277-4DA5-B6BF-C7274376CDA1_8392_1743186690_0?src=LinkedIn
-- https://www.worldquant.com/career-listing/?application=4444526006
+- **Personal Information**: Name, email, phone, location details, address
+- **Professional Links**: LinkedIn, GitHub, portfolio URLs
+- **Employment Details**: Work authorization, salary expectations, notice period, available start date
+- **Smart Field Detection**: Identifies form fields across different websites and formats
+- **Keyboard Shortcut**: Trigger form filling with Ctrl+Shift+F (Cmd+Shift+F on Mac)
 
-### Supported Sites
+#### Supported Sites
 - General form filling - Implemented
-- Myworkday - Not implemented yet
-- jobs.lever.co - Not implemented yet
+- Works well on:
+  - jobs.lever.co
+  - careers.zenitech.co.uk
+- Known issues with:
+  - opswat.com
+  - jobs.jobvite.com
+  - myworkday sites (implementation in progress)
 
-## Planned Features
-- **Education**
-    - Highest Level of Education
-    - Major/Field of Study
-    - Institution Name
-- **Applicant Tracking Systems**
-    - Greenhouse - Not implemented yet
-    - Workable - Not implemented yet
-    - SmartRecruiters - Not implemented yet
-- **Job Boards**
-    - Indeed - Not implemented yet
-    - LinkedIn Apply Forms - Not implemented yet
-    - Glassdoor Apply Forms - Not implemented yet
+## Installation
+
+1. Download the extension files or clone this repository
+2. Open Chrome and navigate to `chrome://extensions/`
+3. Enable "Developer mode" in the top-right corner
+4. Click "Load unpacked" and select the extension directory
+5. The Fill-in extension icon should now appear in your browser toolbar
+
+## Usage
+
+### Job Scraper
+1. Click the Fill-in extension icon and select "Scrape LinkedIn Jobs" or "View Saved Jobs"
+2. Configure your job filters with job title, location, and experience level
+3. View and manage scraped jobs in the job listings page
+4. Use the tabs to switch between un-applied, applied, and archived jobs
+
+### CV Tailoring
+1. Open the settings page and configure your DeepSeek V3 API key
+2. View a job's details and click the "Tailor CV" button
+3. Monitor the tailoring status for each job
+
+### Form Filler
+1. Navigate to a job application form
+2. Click the Fill-in extension icon and select "Auto-Fill Form Fields" or use the keyboard shortcut (Ctrl+Shift+F)
+3. The extension will automatically fill in the form with your information
+
+## Configuration
+
+1. Click the Fill-in extension icon and select "Settings"
+2. Fill in your personal information, which will be used to auto-fill forms
+3. Configure job scraper settings and CV tailoring options
+4. Customize which words to highlight in job descriptions
+
+## CV Tailor Server
+
+The CV tailoring feature requires a local server:
+
+1. Navigate to the `tailor` directory
+2. Install dependencies: `pip install -r requirements.txt`
+3. Install rendercv: `npm install -g rendercv`
+4. Start the server: `python tailor.py server`
+
+## Development
+
+### Project Structure
+- `background.js`: Main background script for the extension
+- `form-filler/`: Form filling functionality
+- `job-scraper/`: LinkedIn job scraping functionality
+- `tailor/`: CV tailoring server
+- `tests/`: Test cases for various features
+
+### Running Tests
+Open the test runner in your browser:
+```
+tests/test-runner.html
+```
+
+## Roadmap
+
+### Completed
+- [x] Fix apply URL functionality
+- [x] Implement PIN and UNPIN features
+- [x] Add applied category for jobs
+- [x] Connect with Python script to tailor CV
+- [x] Enable tailor service to handle multiple requests simultaneously
+- [x] Show notification when resume tailoring is complete
+- [x] Background job scraping without requiring LinkedIn to be open
+- [x] Remove pin when archiving or applying to a job
+- [x] Update UI correctly when archiving jobs
+- [x] Highlight the word "experience" in job descriptions
+- [x] Add word filtering for job titles
+- [x] Add API input in settings page
+- [x] Create tabs for un-applied and applied jobs
+- [x] Sort jobs with date labels (last day, last week, etc.)
+
+### In Progress
+- [ ] Fix jobs without date information
+- [ ] AI filtering for job descriptions
+- [ ] Test API key validation
+- [ ] Fix form filling errors appearing in console
+- [ ] Support for myworkday sites
+- [ ] Support for companies' independent career sites
+- [ ] Support for additional job sites (Indeed, Glassdoor)
+- [ ] Support for more applicant tracking systems (Greenhouse, Workable, SmartRecruiters)
+- [ ] Education field auto-filling
+  - Highest Level of Education
+  - Major/Field of Study
+  - Institution Name
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- This project was created to save time and reduce frustration when applying for jobs
+- Special thanks to all contributors who have helped improve this extension

@@ -9,14 +9,16 @@ import threading
 import uuid
 import time
 from flask import Flask, request, jsonify, send_file
+from config import config
 
 # Configuration
 DEFAULT_CV_PATH = "default_cv.yaml"
 JOB_DESC_PATH = "job_description.txt"
 RAW_RESPONSE_PATH = os.path.abspath("raw_response.txt")
-# OPENROUTER_API_KEY = "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"  # Replace with your OpenRouter API key
-OPENROUTER_API_KEY = "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"
-OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+# Get API configuration from config module
+OPENROUTER_API_KEY = config['openrouter_api_key']
+OPENROUTER_API_URL = config['openrouter_api_url']
+OPENROUTER_MODEL = config['model']
 
 app = Flask(__name__)
 
@@ -77,7 +79,7 @@ def tailor_cv_with_deepseek(_, job_description):  # default_cv parameter not use
         "X-Title": "CV Tailor Script"
     }
     payload = {
-        "model": "deepseek/deepseek-chat-v3-0324:free",
+        "model": OPENROUTER_MODEL,
         "messages": [
             {"role": "user", "content": prompt}
         ],
@@ -252,7 +254,97 @@ def main():
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    return jsonify({"status": "healthy"})
+    return jsonify({
+        "status": "healthy",
+        "api_key_configured": bool(OPENROUTER_API_KEY)
+    })
+
+@app.route('/config', methods=['POST'])
+def update_config():
+    """Endpoint to update the configuration"""
+    global OPENROUTER_API_KEY, OPENROUTER_API_URL, OPENROUTER_MODEL
+
+    data = request.json
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    # Update the configuration
+    updated_config = config.copy()
+
+    if 'openrouter_api_key' in data:
+        updated_config['openrouter_api_key'] = data['openrouter_api_key']
+        OPENROUTER_API_KEY = data['openrouter_api_key']
+
+    if 'model' in data:
+        updated_config['model'] = data['model']
+        OPENROUTER_MODEL = data['model']
+
+    # Save the updated configuration
+    from config import save_config
+    success = save_config(updated_config)
+
+    if success:
+        return jsonify({
+            "success": True,
+            "message": "Configuration updated successfully"
+        })
+    else:
+        return jsonify({
+            "success": False,
+            "message": "Failed to save configuration"
+        }), 500
+
+@app.route('/test-api-key', methods=['POST'])
+def test_api_key():
+    """Endpoint to test an OpenRouter API key"""
+    data = request.json
+    if not data or 'api_key' not in data:
+        return jsonify({"error": "API key is required"}), 400
+
+    api_key = data['api_key']
+
+    # Test the API key by making a request to OpenRouter
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost",
+        "X-Title": "CV Tailor Script"
+    }
+
+    try:
+        # Make a simple request to get available models
+        response = requests.get(
+            url="https://openrouter.ai/api/v1/models",
+            headers=headers
+        )
+
+        if response.status_code != 200:
+            return jsonify({
+                "success": False,
+                "message": f"API key validation failed: {response.status_code} - {response.text}"
+            }), 400
+
+        # Check if DeepSeek model is available
+        models_data = response.json()
+        has_deepseek = False
+
+        if 'data' in models_data:
+            for model in models_data['data']:
+                if 'id' in model and 'deepseek' in model['id'].lower():
+                    has_deepseek = True
+                    break
+
+        return jsonify({
+            "success": True,
+            "has_deepseek": has_deepseek,
+            "message": "API key is valid" + (" and DeepSeek model is available" if has_deepseek else " but DeepSeek model was not found")
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Error testing API key: {str(e)}"
+        }), 500
 
 @app.route('/tailor', methods=['POST'])
 def tailor_endpoint():

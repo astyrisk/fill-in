@@ -372,6 +372,10 @@
             font-weight: 500;
             display: none;
             align-items: center;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
         }
 
         #status.show {
@@ -628,6 +632,14 @@
             font-weight: bold;
         }
 
+        .input-help {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+            margin-bottom: 0;
+            font-style: italic;
+        }
+
         /* Filter scraping status styles */
         .filter-scraping-status {
             margin-top: 10px;
@@ -720,18 +732,21 @@
             <div class="tab" data-tab="employment">
                 <i class="fas fa-briefcase"></i> Employment
             </div>
+            <div class="tab" data-tab="tailor-settings">
+                <i class="fas fa-file-alt"></i> Tailor Settings
+            </div>
         </div>
 
         <div class="content">
-        <!-- Job Scraper Tab Content -->
-        <div id="job-scraper" class="tab-content active">
-            <div class="card">
-                <h2><i class="fas fa-search"></i> Job Filters</h2>
-                <p>Create multiple filters for LinkedIn job scraping. Each filter will search for different job types and locations.</p>
+            <!-- Job Scraper Tab Content -->
+            <div id="job-scraper" class="tab-content active">
+                <div class="card">
+                    <h2><i class="fas fa-search"></i> Job Filters</h2>
+                    <p>Create multiple filters for LinkedIn job scraping. Each filter will search for different job types and locations.</p>
 
-                <div class="filters-container" id="filters-container">
-                    <!-- Filters will be dynamically added here -->
-                </div>
+                    <div class="filters-container" id="filters-container">
+                        <!-- Filters will be dynamically added here -->
+                    </div>
 
                 <div class="empty-state" id="empty-filters-state">
                     <div class="empty-icon"><i class="fas fa-filter"></i></div>
@@ -816,6 +831,28 @@
 
                 <div class="filter-actions-container">
                     <button type="button" id="add-filter" class="button-primary"><i class="fas fa-plus"></i> Add New Job Filter</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-highlighter"></i> Highlight Settings</h2>
+                <p>Customize which words should be highlighted in job descriptions.</p>
+
+                <div class="form-group">
+                    <label for="highlight-words">Words to Highlight:</label>
+                    <input type="text" id="highlight-words" placeholder="e.g., experience, skills, requirements">
+                    <p class="input-help">Enter words separated by commas. These words will be highlighted in job descriptions.</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-ban"></i> Exclusion Settings</h2>
+                <p>Specify words in job titles that should be excluded from scraping.</p>
+
+                <div class="form-group">
+                    <label for="exclude-title-words">Words in Job Titles to Exclude:</label>
+                    <input type="text" id="exclude-title-words" placeholder="e.g., senior, manager, director">
+                    <p class="input-help">Enter words separated by commas. Jobs with these words in their titles will not be scraped.</p>
                 </div>
             </div>
         </div>
@@ -974,14 +1011,57 @@
                 </div>
             </div>
         </div>
+
+        <!-- Tailor Settings Tab Content -->
+        <div id="tailor-settings" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-file-alt"></i> CV Tailoring Settings</h2>
+                <p>Configure settings for the CV tailoring service.</p>
+
+                <div class="tip">
+                    <p><strong><i class="fas fa-lightbulb"></i> Tip:</strong> The CV tailoring service uses DeepSeek V3 API from OpenRouter to tailor your CV for each job. You can get a free API key from <a href="https://openrouter.ai/" target="_blank">OpenRouter</a>.</p>
+                </div>
+
+                <div class="card" style="background-color: #f8f9fa; margin-bottom: 15px;">
+                    <h4><i class="fas fa-question-circle"></i> How to get an OpenRouter API key:</h4>
+                    <ol style="margin-left: 20px; margin-top: 10px;">
+                        <li>Go to <a href="https://openrouter.ai/keys" target="_blank">https://openrouter.ai/keys</a></li>
+                        <li>Sign up or log in with your account</li>
+                        <li>Create a new API key (the free tier includes access to DeepSeek V3)</li>
+                        <li>Copy the API key (starts with "sk-or-v1-...")</li>
+                        <li>Paste it in the field below</li>
+                    </ol>
+                </div>
+
+                <h3><i class="fas fa-key"></i> API Configuration</h3>
+                <div class="form-group">
+                    <label for="openrouterApiKey">OpenRouter API Key (DeepSeek V3):</label>
+                    <input type="password" id="openrouterApiKey" placeholder="sk-or-v1-...">
+                    <small>Your API key is stored locally and is only used to make requests to the OpenRouter API.</small>
+                </div>
+
+                <div class="form-group">
+                    <button id="test-api-key" class="secondary-button">
+                        <i class="fas fa-vial"></i> Test API Key
+                    </button>
+                    <span id="api-key-status"></span>
+                </div>
+
+                <div class="tip">
+                    <p><strong><i class="fas fa-info-circle"></i> Note:</strong> The tailor service must be running at http://localhost:5000 for API key testing and CV tailoring to work. Make sure to start the service before testing your API key.</p>
+                </div>
+            </div>
+        </div>
         </div>
 
-        <div class="button-container">
-            <button id="save"><i class="fas fa-save"></i> Save Settings</button>
-            <div id="status"><i class="fas fa-check-circle"></i> Settings saved successfully!</div>
+        <div style="display: flex; justify-content: center; margin-top: 20px; margin-bottom: 30px;">
+            <button id="save" style="padding: 10px 20px; font-size: 16px;"><i class="fas fa-save"></i> Save Settings</button>
         </div>
+
+
     </div>
 
+    <div id="status"><i class="fas fa-check-circle"></i> Settings saved successfully!</div>
     <script src="options.js"></script>
 </body>
 </html>

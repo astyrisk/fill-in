@@ -139,6 +139,36 @@ function getSelectedCountry(filter = null) {
     return 'Unknown';
 }
 
+// Function to check if a job title contains excluded words
+async function shouldExcludeJob(title) {
+    return new Promise((resolve) => {
+        // Get the list of excluded words from settings
+        chrome.storage.sync.get({ excludeTitleWords: '' }, (data) => {
+            if (!data.excludeTitleWords || !title) {
+                resolve(false);
+                return;
+            }
+
+            // Convert title to lowercase for case-insensitive comparison
+            const lowerTitle = title.toLowerCase();
+
+            // Split the excluded words by comma and trim whitespace
+            const excludedWords = data.excludeTitleWords.split(',')
+                .map(word => word.trim().toLowerCase())
+                .filter(word => word.length > 0);
+
+            // Check if any excluded word is in the title
+            const shouldExclude = excludedWords.some(word => lowerTitle.includes(word));
+
+            if (shouldExclude) {
+                console.log(`Excluding job with title "${title}" because it contains excluded word(s)`);
+            }
+
+            resolve(shouldExclude);
+        });
+    });
+}
+
 // Function to scrape job listings from the current page
 async function scrapeCurrentPage(jobCardSelector, filter = null) {
     try {
@@ -238,25 +268,38 @@ async function scrapeCurrentPage(jobCardSelector, filter = null) {
             };
         });
 
-        // Filter out jobs with missing essential data
-        const validJobs = extractedJobs.filter(job => {
+        // Filter out jobs with missing essential data and excluded words in titles
+        const validJobs = [];
+        let excludedCount = 0;
+        let missingDataCount = 0;
+
+        for (const job of extractedJobs) {
+            // Check for essential data
             const hasEssentialData = job.title && job.title !== 'Unknown Title' &&
                                      job.company && job.company !== 'Unknown Company' &&
                                      job.jobId;
 
-            // Silently filter out jobs with missing essential data
             if (!hasEssentialData) {
-                // Don't log anything to avoid console warnings
+                missingDataCount++;
+                continue;
             }
 
-            return hasEssentialData;
-        });
+            // Check if job should be excluded based on title
+            const shouldExclude = await shouldExcludeJob(job.title);
 
-        // Silently filter out jobs with missing data
-        const filteredCount = extractedJobs.length - validJobs.length;
-        if (filteredCount > 0) {
-            console.log(`Processed ${extractedJobs.length} jobs, using ${validJobs.length} valid entries`);
+            if (shouldExclude) {
+                excludedCount++;
+                continue;
+            }
+
+            validJobs.push(job);
         }
+
+        // Log filtering results
+        if (missingDataCount > 0 || excludedCount > 0) {
+            console.log(`Processed ${extractedJobs.length} jobs: ${missingDataCount} with missing data, ${excludedCount} excluded by title, ${validJobs.length} valid entries`);
+        }
+
         return validJobs;
     } catch (error) {
         console.error("Error scraping current page:", error);
