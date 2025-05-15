@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Job Filter Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1, h2 {
+            color: #0073b1;
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .test-result {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            color: green;
+        }
+        .failure {
+            color: red;
+        }
+        button {
+            background-color: #0073b1;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #005582;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 0;
+            white-space: pre-wrap;
+        }
+        .test-output {
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .test-group {
+            margin-bottom: 30px;
+        }
+        .test-controls {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Job Filter Uniqueness Tests</h1>
+    
+    <div class="test-section">
+        <div class="test-title">Test Suite</div>
+        <p>This page runs tests for the job filter uniqueness functionality.</p>
+        
+        <div class="test-controls">
+            <button id="run-all">Run All Tests</button>
+            <button id="run-basic">Run Basic Tests</button>
+            <button id="run-edge">Run Edge Case Tests</button>
+            <button id="run-integration">Run Integration Tests</button>
+            <button id="clear-results">Clear Results</button>
+        </div>
+    </div>
+    
+    <div class="test-group">
+        <h2>Basic Tests</h2>
+        <div id="basic-results" class="test-result">
+            <div class="test-output">Click "Run Basic Tests" to start...</div>
+        </div>
+    </div>
+    
+    <div class="test-group">
+        <h2>Edge Case Tests</h2>
+        <div id="edge-results" class="test-result">
+            <div class="test-output">Click "Run Edge Case Tests" to start...</div>
+        </div>
+    </div>
+    
+    <div class="test-group">
+        <h2>Integration Tests</h2>
+        <div id="integration-results" class="test-result">
+            <div class="test-output">Click "Run Integration Tests" to start...</div>
+        </div>
+    </div>
+    
+    <!-- Include test scripts -->
+    <script src="test-job-filter-basic.js"></script>
+    <script src="test-job-filter-edge-cases.js"></script>
+    <script src="test-job-filter-integration.js"></script>
+    
+    <script>
+        // Override console.log to capture output
+        const originalConsoleLog = console.log;
+        const originalConsoleAssert = console.assert;
+        
+        let currentOutputElement = null;
+        
+        function captureConsole(outputElement) {
+            currentOutputElement = outputElement;
+            
+            console.log = function() {
+                const args = Array.from(arguments);
+                const message = args.join(' ');
+                
+                if (currentOutputElement) {
+                    currentOutputElement.innerHTML += message + '\n';
+                }
+                
+                // Also log to the original console
+                originalConsoleLog.apply(console, arguments);
+            };
+            
+            console.assert = function(condition, message) {
+                if (!condition) {
+                    const assertMessage = 'Assertion failed: ' + message;
+                    
+                    if (currentOutputElement) {
+                        currentOutputElement.innerHTML += '<span class="failure">' + assertMessage + '</span>\n';
+                    }
+                    
+                    // Also log to the original console
+                    originalConsoleAssert.apply(console, arguments);
+                }
+            };
+        }
+        
+        function resetConsole() {
+            console.log = originalConsoleLog;
+            console.assert = originalConsoleAssert;
+            currentOutputElement = null;
+        }
+        
+        // Test runner functions
+        function runBasicTests() {
+            const outputElement = document.querySelector('#basic-results .test-output');
+            outputElement.innerHTML = '';
+            captureConsole(outputElement);
+            
+            try {
+                runAllTests(); // From test-job-filter-basic.js
+            } catch (error) {
+                console.log('Error running basic tests:', error);
+            }
+            
+            resetConsole();
+        }
+        
+        function runEdgeCaseTests() {
+            const outputElement = document.querySelector('#edge-results .test-output');
+            outputElement.innerHTML = '';
+            captureConsole(outputElement);
+            
+            try {
+                // This function is from test-job-filter-edge-cases.js
+                if (typeof window.testCaseInsensitivity === 'function') {
+                    window.runAllTests();
+                } else {
+                    console.log('Edge case tests not found. Make sure test-job-filter-edge-cases.js is loaded correctly.');
+                }
+            } catch (error) {
+                console.log('Error running edge case tests:', error);
+            }
+            
+            resetConsole();
+        }
+        
+        function runIntegrationTests() {
+            const outputElement = document.querySelector('#integration-results .test-output');
+            outputElement.innerHTML = '';
+            captureConsole(outputElement);
+            
+            try {
+                // This function is from test-job-filter-integration.js
+                if (typeof window.testFullWorkflow === 'function') {
+                    window.runAllTests();
+                } else {
+                    console.log('Integration tests not found. Make sure test-job-filter-integration.js is loaded correctly.');
+                }
+            } catch (error) {
+                console.log('Error running integration tests:', error);
+            }
+            
+            resetConsole();
+        }
+        
+        function runAllTests() {
+            runBasicTests();
+            runEdgeCaseTests();
+            runIntegrationTests();
+        }
+        
+        function clearResults() {
+            document.querySelector('#basic-results .test-output').innerHTML = 'Click "Run Basic Tests" to start...';
+            document.querySelector('#edge-results .test-output').innerHTML = 'Click "Run Edge Case Tests" to start...';
+            document.querySelector('#integration-results .test-output').innerHTML = 'Click "Run Integration Tests" to start...';
+        }
+        
+        // Add event listeners
+        document.getElementById('run-all').addEventListener('click', runAllTests);
+        document.getElementById('run-basic').addEventListener('click', runBasicTests);
+        document.getElementById('run-edge').addEventListener('click', runEdgeCaseTests);
+        document.getElementById('run-integration').addEventListener('click', runIntegrationTests);
+        document.getElementById('clear-results').addEventListener('click', clearResults);
+    </script>
+</body>
+</html>

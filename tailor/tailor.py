@@ -498,7 +498,7 @@ def run_server(port=5000):
 
     print("Started worker thread and stale request checker thread")
 
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)  # Changed debug=True to debug=False
 
 if __name__ == "__main__":
     import sys
