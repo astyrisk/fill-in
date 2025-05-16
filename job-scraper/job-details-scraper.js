@@ -15,10 +15,14 @@ function extractJobIdFromUrl(url) {
 function scrapeJobDetails() {
     console.log('Scraping job details...');
 
-    try {
-        // Extract job description
-        const descriptionElement = document.querySelector('.jobs-description__content');
-        const description = descriptionElement ? descriptionElement.innerHTML : null;
+    return new Promise((resolve) => {
+        // Wait for a few seconds to ensure the job details are fully loaded
+        console.log('Waiting for job details to load completely...');
+        setTimeout(() => {
+            try {
+                // Extract job description
+                const descriptionElement = document.querySelector('.jobs-description__content');
+                const description = descriptionElement ? descriptionElement.innerHTML : null;
 
         // Extract job type information (Hybrid Full-time Mid-Senior level, etc.)
         let jobTypeInfo = null;
@@ -264,24 +268,27 @@ function scrapeJobDetails() {
         // Use the isEasyApplyJob variable we set earlier
         console.log('Job details scraper - isEasyApply:', isEasyApplyJob, 'applyButtonType:', applyButtonType);
 
-        // Return the scraped details
-        return {
-            description,
-            postingDate,
-            convertedDate,
-            skills,
-            applicantCount,
-            applicationUrl,
-            applyButtonType,
-            noLongerAccepting,
-            isEasyApply: isEasyApplyJob,
-            jobTypeInfo, // Add the job type information (Hybrid Full-time Mid-Senior level, etc.)
-            scrapedAt: new Date().toISOString()
-        };
-    } catch (error) {
-        console.error('Error scraping job details:', error);
-        return null;
-    }
+                // Return the scraped details
+                const jobDetails = {
+                    description,
+                    postingDate,
+                    convertedDate,
+                    skills,
+                    applicantCount,
+                    applicationUrl,
+                    applyButtonType,
+                    noLongerAccepting,
+                    isEasyApply: isEasyApplyJob,
+                    jobTypeInfo, // Add the job type information (Hybrid Full-time Mid-Senior level, etc.)
+                    scrapedAt: new Date().toISOString()
+                };
+                resolve(jobDetails);
+            } catch (error) {
+                console.error('Error scraping job details:', error);
+                resolve(null);
+            }
+        }, 3000); // Wait for 3 seconds to ensure the job details are fully loaded
+    });
 }
 
 // Variable to store the captured application URL
@@ -293,53 +300,56 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         console.log('Received request to scrape job details');
         console.log('Request data:', request);
 
-        // Scrape job details
-        const jobDetails = scrapeJobDetails();
+        // Scrape job details (now returns a Promise)
+        scrapeJobDetails().then(jobDetails => {
+            // If the job was already marked as Easy Apply in the initial scraping, make sure we preserve that
+            if (request.jobData && request.jobData.isEasyApply) {
+                console.log('Job was already marked as Easy Apply in initial scraping');
+                jobDetails.isEasyApply = true;
+            }
 
-        // If the job was already marked as Easy Apply in the initial scraping, make sure we preserve that
-        if (request.jobData && request.jobData.isEasyApply) {
-            console.log('Job was already marked as Easy Apply in initial scraping');
-            jobDetails.isEasyApply = true;
-        }
+            // Check if we have a captured URL for this job
+            const jobId = extractJobIdFromUrl(window.location.href);
+            if (jobId) {
+                // Check if we have a captured URL in storage
+                chrome.storage.local.get(['capturedApplicationUrls'], (data) => {
+                    const capturedUrls = data.capturedApplicationUrls || {};
+                    if (capturedUrls[jobId]) {
+                        console.log('Found captured URL in storage for job', jobId, ':', capturedUrls[jobId]);
 
-        // Check if we have a captured URL for this job
-        const jobId = extractJobIdFromUrl(window.location.href);
-        if (jobId) {
-            // Check if we have a captured URL in storage
-            chrome.storage.local.get(['capturedApplicationUrls'], (data) => {
-                const capturedUrls = data.capturedApplicationUrls || {};
-                if (capturedUrls[jobId]) {
-                    console.log('Found captured URL in storage for job', jobId, ':', capturedUrls[jobId]);
+                        // Update the job details with the captured URL
+                        jobDetails.applicationUrl = capturedUrls[jobId];
 
-                    // Update the job details with the captured URL
-                    jobDetails.applicationUrl = capturedUrls[jobId];
-
-                    // Send the updated job details back
-                    sendResponse({
-                        success: true,
-                        jobDetails
-                    });
-                } else {
-                    // No captured URL found, send the original job details
-                    sendResponse({
-                        success: true,
-                        jobDetails
-                    });
-                }
-            });
-
-            // Return true to indicate we'll send a response asynchronously
-            return true;
-        } else {
-            // No job ID, send the original job details
+                        // Send the updated job details back
+                        sendResponse({
+                            success: true,
+                            jobDetails
+                        });
+                    } else {
+                        // No captured URL found, send the original job details
+                        sendResponse({
+                            success: true,
+                            jobDetails
+                        });
+                    }
+                });
+            } else {
+                // No job ID, send the original job details
+                sendResponse({
+                    success: true,
+                    jobDetails
+                });
+            }
+        }).catch(error => {
+            console.error('Error in scrapeJobDetails:', error);
             sendResponse({
-                success: true,
-                jobDetails
+                success: false,
+                error: error.message || 'Unknown error in job details scraping'
             });
+        });
 
-            // Return true to indicate we'll send a response asynchronously
-            return true;
-        }
+        // Return true to indicate we'll send a response asynchronously
+        return true;
     } else if (request.action === 'capturedApplicationUrl') {
         // Store the captured URL from the background script
         capturedApplicationUrl = request.url;

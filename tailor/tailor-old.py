@@ -8,17 +8,16 @@ import queue
 import threading
 import uuid
 import time
-from flask import Flask, request, jsonify
-from config import config
+from flask import Flask, request, jsonify, send_file
 
 # Configuration
 DEFAULT_CV_PATH = "default_cv.yaml"
 JOB_DESC_PATH = "job_description.txt"
 RAW_RESPONSE_PATH = os.path.abspath("raw_response.txt")
-# Get API configuration from config module
-OPENROUTER_API_KEY = config['openrouter_api_key']
-OPENROUTER_API_URL = config['openrouter_api_url']
-OPENROUTER_MODEL = config['model']
+# OPENROUTER_API_KEY = "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"  # Replace with your OpenRouter API key
+# OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = "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"
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 app = Flask(__name__)
 
@@ -53,7 +52,6 @@ def tailor_cv_with_deepseek(_, job_description):  # default_cv parameter not use
     with open(DEFAULT_CV_PATH, 'r') as file:
         original_yaml_str = file.read()
 
-    # Use the default prompt from tailor-old.py
     prompt = (
         "You are an expert resume writer. I have a default CV in YAML format and a job description. "
         "Tailor the CV to match the ats important keywords and "
@@ -67,30 +65,20 @@ def tailor_cv_with_deepseek(_, job_description):  # default_cv parameter not use
         "In summary, I am a fresh graduate student, So you can start with that . "
         "Use ** to make text bold as markdown syntax. "
         "Don't add any new fields. "
-        "Also, add a field called 'filename' at the very top of the YAML with a suggested filename for the CV that includes the job title, applicant and compant name. "
+        "Also, add a field called 'filename' at the very top of the YAML with a suggested filename for the CV that includes the job title. "
         "Here is the exact format of the original YAML:\n\n" + original_yaml_str + "\n\n"
         "Job Description:\n" + job_description + "\n\n"
         "Output the tailored CV in YAML format with the exact same structure and order as the original, plus the filename field at the top."
     )
 
-    # Log the API key being used (with partial masking for security)
-    api_key = OPENROUTER_API_KEY.strip()  # Ensure no whitespace
-    masked_key = f"{api_key[:8]}...{api_key[-8:]}" if len(api_key) > 16 else "Invalid API key format"
-    print(f"Using API key: {masked_key}")
-
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
         "HTTP-Referer": "http://localhost",
         "X-Title": "CV Tailor Script"
     }
-
-    # Log the model being used
-    model = OPENROUTER_MODEL
-    print(f"Using model: {model}")
-
     payload = {
-        "model": model,
+        "model": "deepseek/deepseek-chat-v3-0324:free",
         "messages": [
             {"role": "user", "content": prompt}
         ],
@@ -98,103 +86,48 @@ def tailor_cv_with_deepseek(_, job_description):  # default_cv parameter not use
         "temperature": 0.7
     }
 
-    print(f"Making request to OpenRouter API URL: {OPENROUTER_API_URL}")
-    try:
-        response = requests.post(
-            url=OPENROUTER_API_URL,
-            headers=headers,
-            data=json.dumps(payload)
-        )
-
-        # Log the response status code
-        print(f"OpenRouter API response status code: {response.status_code}")
-
-        if response.status_code == 200:
-            tailored_cv_text = response.json()["choices"][0]["message"]["content"].strip()
-
-            # Save the raw response for debugging
+    response = requests.post(
+        url=OPENROUTER_API_URL,
+        headers=headers,
+        data=json.dumps(payload)
+    )
+    if response.status_code == 200:
+        tailored_cv_text = response.json()["choices"][0]["message"]["content"].strip()
+        try:
+            start_marker = "```yaml"
+            end_marker = "```"
+            if start_marker in tailored_cv_text:
+                start_idx = tailored_cv_text.index(start_marker) + len(start_marker)
+                end_idx = tailored_cv_text.index(end_marker, start_idx)
+                yaml_text = tailored_cv_text[start_idx:end_idx].strip()
+            else:
+                yaml_text = tailored_cv_text
+        except ValueError:
             with open(RAW_RESPONSE_PATH, 'w') as f:
                 f.write(tailored_cv_text)
+            print(f"Could not extract YAML from response. Raw response saved to {RAW_RESPONSE_PATH}")
+            return None
 
-            try:
-                # Check for YAML code block markers
-                start_marker = "```yaml"
-                end_marker = "```"
+        print(tailored_cv_text)
 
-                if start_marker in tailored_cv_text:
-                    start_idx = tailored_cv_text.index(start_marker) + len(start_marker)
-                    try:
-                        end_idx = tailored_cv_text.index(end_marker, start_idx)
-                        yaml_text = tailored_cv_text[start_idx:end_idx].strip()
-                    except ValueError:
-                        # If no end marker is found, just use everything after the start marker
-                        yaml_text = tailored_cv_text[start_idx:].strip()
-                        print("No end marker found, using all content after start marker")
-                else:
-                    yaml_text = tailored_cv_text
-
-                # Check if we have valid YAML content
-                if not yaml_text or yaml_text.strip() == "":
-                    print("Empty YAML content extracted")
-                    with open(RAW_RESPONSE_PATH, 'w') as f:
-                        f.write(tailored_cv_text)
-                    print(f"Raw response saved to {RAW_RESPONSE_PATH}")
-                    return None
-            except Exception as e:
-                with open(RAW_RESPONSE_PATH, 'w') as f:
-                    f.write(tailored_cv_text)
-                print(f"Could not extract YAML from response: {str(e)}. Raw response saved to {RAW_RESPONSE_PATH}")
-                return None
-
-            try:
-                # Remove any remaining code block markers if they exist
-                if yaml_text.startswith("```") or "```yaml" in yaml_text:
-                    yaml_text = yaml_text.replace("```yaml", "").replace("```", "").strip()
-
-                # Try to parse the YAML
-                tailored_cv = yaml.safe_load(yaml_text)
-
-                # Check if we got a valid result
-                if not tailored_cv or not isinstance(tailored_cv, dict):
-                    print(f"Invalid YAML structure: {type(tailored_cv)}")
-                    # Create a minimal valid structure
-                    return {
-                        'filename': 'tailored_cv.pdf',
-                        'name': 'CV Parsing Error',
-                        'location': 'Error occurred while parsing the CV',
-                        'sections': []
-                    }
-
-                return tailored_cv
-            except yaml.YAMLError as e:
-                with open(RAW_RESPONSE_PATH, 'w') as f:
-                    f.write(tailored_cv_text)
-                print(f"Error parsing tailored CV YAML: {e}")
-                print(f"Raw response saved to {RAW_RESPONSE_PATH}")
-
-                # Create a minimal valid structure
-                return {
-                    'filename': 'tailored_cv.pdf',
-                    'name': 'CV Parsing Error',
-                    'location': 'Error occurred while parsing the CV',
-                    'sections': []
-                }
-        else:
+        try:
+            tailored_cv = yaml.safe_load(yaml_text)
+            return tailored_cv
+        except yaml.YAMLError as e:
             with open(RAW_RESPONSE_PATH, 'w') as f:
-                f.write(response.text)
-            print(f"OpenRouter API error: {response.status_code} - {response.text}")
+                f.write(tailored_cv_text)
+            print(f"Error parsing tailored CV YAML: {e}")
             print(f"Raw response saved to {RAW_RESPONSE_PATH}")
             return None
-    except Exception as e:
-        error_message = f"Exception when calling OpenRouter API: {str(e)}"
-        print(error_message)
+    else:
         with open(RAW_RESPONSE_PATH, 'w') as f:
-            f.write(error_message)
+            f.write(response.text)
+        print(f"OpenRouter API error: {response.status_code} - {response.text}")
+        print(f"Raw response saved to {RAW_RESPONSE_PATH}")
         return None
 
 # Step 4: Save the tailored CV
 def save_yaml(data, file_path):
-    # Simplified approach following tailor-old.py
     with open(file_path, 'w') as file:
         yaml.dump(data, file, default_flow_style=False, sort_keys=False)
     print(f"Tailored CV saved to {file_path}")
@@ -206,50 +139,41 @@ def render_cv(yaml_path, output_pdf=None):
 
     if not os.path.exists(yaml_path):
         print(f"Error: YAML file {yaml_path} does not exist.")
-        return False
-
-    # Log the render operation
-    print(f"Rendering CV from {yaml_path} to {output_pdf}")
-
+        return
     try:
         # Run rendercv without --output, let it create default output
         subprocess.run(["rendercv", "render", yaml_path], check=True)
 
         # Find the generated PDF in the rendercv_output directory
         rendercv_output_dir = os.path.join(os.path.dirname(yaml_path), "rendercv_output")
-        print(f"Looking for output in {rendercv_output_dir}")
-
         if os.path.exists(rendercv_output_dir):
+
             # Look for PDF files in the output directory
             pdf_files = [f for f in os.listdir(rendercv_output_dir) if f.endswith('.pdf')]
-            print(f"Found {len(pdf_files)} PDF files in output directory")
 
             if pdf_files:
                 # Use the first PDF file found (there should typically be only one)
                 default_pdf = os.path.join(rendercv_output_dir, pdf_files[0])
-                print(f"Found PDF: {default_pdf}")
-
-                # Make sure the output directory exists
-                output_dir = os.path.dirname(os.path.abspath(output_pdf))
-                if not os.path.exists(output_dir):
-                    os.makedirs(output_dir, exist_ok=True)
-                    print(f"Created output directory: {output_dir}")
-
                 # Move the default PDF to desired location
                 shutil.move(default_pdf, output_pdf)
-                print(f"PDF generated and moved to: {output_pdf}")
+                print(f"PDF generated: {output_pdf}")
 
                 # Clean up the rendercv_output directory after moving the PDF
                 try:
                     shutil.rmtree(rendercv_output_dir)
-                    print(f"Cleaned up {rendercv_output_dir}")
                 except Exception as e:
                     print(f"Warning: Could not remove rendercv_output directory: {e}")
 
                 return True
             else:
-                print(f"No PDF files found in {rendercv_output_dir}")
-                return False
+                # If no PDF found, look for HTML files that might need conversion
+                html_files = [f for f in os.listdir(rendercv_output_dir) if f.endswith('.html')]
+                if html_files:
+                    print(f"Found HTML file but no PDF. You may need to convert it manually.")
+                    return False
+                else:
+                    print(f"No output files found in {rendercv_output_dir}")
+                    return False
         else:
             print(f"Output directory {rendercv_output_dir} not found")
             return False
@@ -290,9 +214,6 @@ def main():
             # Also remove any .yaml.pdf extension and replace with just .pdf
             suggested_filename = suggested_filename.replace(".yaml.pdf", ".pdf")
 
-            # Remove quotes if they exist
-            suggested_filename = suggested_filename.strip('"\'')
-
             # Ensure it has .pdf extension
             if not suggested_filename.lower().endswith('.pdf'):
                 suggested_filename += '.pdf'
@@ -305,7 +226,6 @@ def main():
     # Create a temporary YAML file for processing
     temp_yaml_path = os.path.abspath("temp_tailored_cv.yaml")
     save_yaml(tailored_cv, temp_yaml_path)
-    print(f"Saved temporary YAML file: {temp_yaml_path}")
 
     # Render the CV
     success = render_cv(temp_yaml_path, output_pdf=pdf_filename)
@@ -313,14 +233,12 @@ def main():
     # Remove the temporary YAML file after PDF generation
     if os.path.exists(temp_yaml_path):
         os.remove(temp_yaml_path)
-        print(f"Removed temporary YAML file: {temp_yaml_path}")
 
     # Clean up the rendercv_output directory if it exists
     rendercv_output_dir = os.path.join(os.path.dirname(temp_yaml_path), "rendercv_output")
     if os.path.exists(rendercv_output_dir):
         try:
             shutil.rmtree(rendercv_output_dir)
-            print(f"Cleaned up {rendercv_output_dir}")
         except Exception as e:
             print(f"Warning: Could not remove rendercv_output directory: {e}")
 
@@ -335,264 +253,7 @@ def main():
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    return jsonify({
-        "status": "healthy",
-        "api_key_configured": bool(OPENROUTER_API_KEY)
-    })
-
-@app.route('/restart', methods=['POST'])
-def restart_service():
-    """Endpoint to restart the tailor service"""
-    # Reload configuration to ensure we have the latest settings
-    from config import load_config
-    global OPENROUTER_API_KEY, OPENROUTER_API_URL, OPENROUTER_MODEL
-    current_config = load_config()
-
-    # Ensure API key is properly formatted (trimmed, etc.)
-    api_key = current_config['openrouter_api_key'].strip()
-    OPENROUTER_API_KEY = api_key
-    OPENROUTER_API_URL = current_config['openrouter_api_url']
-    OPENROUTER_MODEL = current_config['model']
-
-    # Log the restart
-    masked_key = f"{api_key[:8]}...{api_key[-8:]}" if len(api_key) > 16 else "Invalid API key format"
-    print("Tailor service restarted with updated configuration")
-    print(f"API Key: {masked_key} (length: {len(api_key)})")
-    print(f"API Key starts with 'sk-or-': {api_key.startswith('sk-or-')}")
-    print(f"Model: {OPENROUTER_MODEL}")
-    print(f"API URL: {OPENROUTER_API_URL}")
-
-    # Test the API key with a simple request
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost",
-        "X-Title": "CV Tailor Script"
-    }
-
-    try:
-        test_response = requests.get(
-            url="https://openrouter.ai/api/v1/models",
-            headers=headers,
-            timeout=5  # Add a timeout to prevent hanging
-        )
-
-        if test_response.status_code == 200:
-            print("API key validation successful during restart")
-        else:
-            print(f"API key validation failed during restart: {test_response.status_code} - {test_response.text}")
-    except Exception as e:
-        print(f"Error testing API key during restart: {str(e)}")
-
-    return jsonify({
-        "success": True,
-        "message": "Tailor service restarted successfully",
-        "config": {
-            "api_key_masked": masked_key,
-            "api_key_length": len(api_key),
-            "api_key_valid_format": api_key.startswith('sk-or-'),
-            "model": OPENROUTER_MODEL,
-            "api_url": OPENROUTER_API_URL
-        }
-    })
-
-@app.route('/config-status', methods=['GET'])
-def config_status():
-    """Endpoint to check the current configuration status"""
-    # Mask the API key for security
-    api_key = OPENROUTER_API_KEY.strip()
-    masked_key = f"{api_key[:8]}...{api_key[-8:]}" if len(api_key) > 16 else "Invalid API key format"
-
-    return jsonify({
-        "success": True,
-        "config": {
-            "api_key_masked": masked_key,
-            "api_key_length": len(api_key),
-            "api_key_valid_format": api_key.startswith('sk-or-'),
-            "model": OPENROUTER_MODEL,
-            "api_url": OPENROUTER_API_URL
-        }
-    })
-
-@app.route('/config', methods=['POST'])
-def update_config():
-    """Endpoint to update the configuration"""
-    global OPENROUTER_API_KEY, OPENROUTER_API_URL, OPENROUTER_MODEL
-
-    data = request.json
-    if not data:
-        return jsonify({"error": "No data provided"}), 400
-
-    # Update the configuration
-    updated_config = config.copy()
-
-    if 'openrouter_api_key' in data:
-        # Ensure API key is properly formatted (trimmed, etc.)
-        api_key = data['openrouter_api_key'].strip()
-
-        # Log the API key being updated (with partial masking for security)
-        masked_key = f"{api_key[:8]}...{api_key[-8:]}" if len(api_key) > 16 else "Invalid API key format"
-        print(f"Updating API key: {masked_key} (length: {len(api_key)})")
-
-        # Check if API key is in the correct format
-        if api_key and not api_key.startswith("sk-or-"):
-            print(f"WARNING: API key format is invalid. API key must start with 'sk-or-'. Current key: {masked_key}")
-
-        updated_config['openrouter_api_key'] = api_key
-        OPENROUTER_API_KEY = api_key
-
-    if 'model' in data:
-        model = data['model']
-        print(f"Updating model: {model}")
-        updated_config['model'] = model
-        OPENROUTER_MODEL = model
-
-    # Save the updated configuration
-    from config import save_config
-    success = save_config(updated_config)
-
-    if success:
-        print("Configuration updated and saved successfully")
-        return jsonify({
-            "success": True,
-            "message": "Configuration updated successfully"
-        })
-    else:
-        print("Failed to save configuration")
-        return jsonify({
-            "success": False,
-            "message": "Failed to save configuration"
-        }), 500
-
-@app.route('/test-api-key', methods=['POST'])
-def test_api_key():
-    """Endpoint to test an OpenRouter API key"""
-    data = request.json
-    if not data or 'api_key' not in data:
-        return jsonify({"error": "API key is required"}), 400
-
-    api_key = data['api_key'].strip()  # Trim any whitespace
-
-    # Check if API key is in the correct format
-    if not api_key.startswith("sk-or-"):
-        return jsonify({
-            "success": False,
-            "message": f"API key format is invalid. OpenRouter API keys should start with 'sk-or-'"
-        }), 400
-
-    # Log the API key being tested (with partial masking for security)
-    masked_key = f"{api_key[:8]}...{api_key[-8:]}" if len(api_key) > 16 else "Invalid API key format"
-    print(f"Testing API key: {masked_key}")
-    print(f"API key length: {len(api_key)}")
-
-    # Test the API key by making a request to OpenRouter
-    auth_header = f"Bearer {api_key}"
-    headers = {
-        "Authorization": auth_header,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost",
-        "X-Title": "CV Tailor Script"
-    }
-
-    try:
-        # First, make a simple request to get available models
-        print("Making request to get available models")
-        response = requests.get(
-            url="https://openrouter.ai/api/v1/models",
-            headers=headers
-        )
-
-        if response.status_code != 200:
-            print(f"API key validation failed: {response.status_code} - {response.text}")
-            return jsonify({
-                "success": False,
-                "message": f"API key validation failed: {response.status_code} - {response.text}"
-            }), 400
-
-        # Check if DeepSeek model is available
-        models_data = response.json()
-        has_deepseek = False
-        deepseek_model_id = None
-        available_models = []
-
-        if 'data' in models_data:
-            for model in models_data['data']:
-                if 'id' in model:
-                    available_models.append(model['id'])
-                    if 'deepseek' in model['id'].lower():
-                        has_deepseek = True
-                        deepseek_model_id = model['id']
-                        print(f"Found DeepSeek model: {deepseek_model_id}")
-
-        print(f"Available models: {', '.join(available_models)}")
-
-        # Now, test the API key with the actual model we'll use for tailoring
-        # This ensures we're testing the exact same configuration that will be used for tailoring
-        test_model = deepseek_model_id or "deepseek/deepseek-chat-v3-0324:free"
-        print(f"Testing API key with model: {test_model}")
-
-        test_payload = {
-            "model": test_model,
-            "messages": [
-                {"role": "user", "content": "Hello, this is a test message. Please respond with 'OK' if you can hear me."}
-            ],
-            "max_tokens": 10,
-            "temperature": 0.7
-        }
-
-        test_response = requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=test_payload
-        )
-
-        if test_response.status_code != 200:
-            print(f"API key test with model failed: {test_response.status_code} - {test_response.text}")
-            return jsonify({
-                "success": False,
-                "message": f"API key validation with model failed: {test_response.status_code} - {test_response.text}"
-            }), 400
-
-        print("API key test with model successful")
-
-        # If the API key is valid, update the configuration
-        global OPENROUTER_API_KEY
-        OPENROUTER_API_KEY = api_key
-
-        # Update the configuration file
-        from config import save_config
-        updated_config = config.copy()
-        updated_config['openrouter_api_key'] = api_key
-
-        # If we found a DeepSeek model, update the model ID
-        if deepseek_model_id:
-            global OPENROUTER_MODEL
-            OPENROUTER_MODEL = deepseek_model_id
-            updated_config['model'] = deepseek_model_id
-
-        # Save the updated configuration
-        save_success = save_config(updated_config)
-
-        # Log the configuration update
-        if save_success:
-            print(f"Configuration updated with new API key and model: {deepseek_model_id}")
-        else:
-            print("Failed to save configuration file with new API key")
-
-        return jsonify({
-            "success": True,
-            "has_deepseek": has_deepseek,
-            "config_saved": save_success,
-            "model_tested": test_model,
-            "message": "API key is valid" + (" and DeepSeek model is available" if has_deepseek else " but DeepSeek model was not found")
-        })
-
-    except Exception as e:
-        print(f"Error testing API key: {str(e)}")
-        return jsonify({
-            "success": False,
-            "message": f"Error testing API key: {str(e)}"
-        }), 500
+    return jsonify({"status": "healthy"})
 
 @app.route('/tailor', methods=['POST'])
 def tailor_endpoint():
@@ -605,7 +266,6 @@ def tailor_endpoint():
 
     # Generate a unique request ID
     request_id = str(uuid.uuid4())
-    print(f"Received new tailor request with ID: {request_id}")
 
     # Initialize request status
     with status_lock:
@@ -613,13 +273,9 @@ def tailor_endpoint():
             'status': 'queued',
             'created_at': time.time()
         }
-        # Log the current queue size
-        queue_size = request_queue.qsize()
-        print(f"Current queue size before adding new request: {queue_size}")
 
     # Add the request to the queue
     request_queue.put((request_id, job_description))
-    print(f"Added request {request_id} to the queue")
 
     # Return the request ID to the client
     return jsonify({
@@ -740,32 +396,14 @@ def check_stale_requests():
 def process_queue():
     while True:
         try:
-            # Log the current queue size
-            queue_size = request_queue.qsize()
-            print(f"Current queue size: {queue_size}")
-
             # Get a request from the queue
-            print("Waiting for the next request from the queue...")
             request_id, job_description = request_queue.get()
-            print(f"Got request {request_id} from the queue")
 
             # Update status to processing
             with status_lock:
                 request_status[request_id]['status'] = 'processing'
                 # Update the timestamp to track when processing started
                 request_status[request_id]['processing_started_at'] = time.time()
-                print(f"Updated status of request {request_id} to 'processing'")
-
-            # Reload configuration to ensure we have the latest API key
-            from config import load_config
-            global OPENROUTER_API_KEY, OPENROUTER_API_URL, OPENROUTER_MODEL
-            current_config = load_config()
-
-            # Ensure API key is properly formatted (trimmed, etc.)
-            api_key = current_config['openrouter_api_key'].strip()
-            OPENROUTER_API_KEY = api_key
-            OPENROUTER_API_URL = current_config['openrouter_api_url']
-            OPENROUTER_MODEL = current_config['model']
 
             # Load default CV
             default_cv = load_yaml(DEFAULT_CV_PATH)
@@ -796,22 +434,14 @@ def process_queue():
                     # Also remove any .yaml.pdf extension and replace with just .pdf
                     suggested_filename = suggested_filename.replace(".yaml.pdf", ".pdf")
 
-                    # Remove quotes if they exist
-                    suggested_filename = suggested_filename.strip('"\'')
-
                     # Ensure it has .pdf extension
                     if not suggested_filename.lower().endswith('.pdf'):
                         suggested_filename += '.pdf'
                     pdf_filename = suggested_filename
 
-                    print(f"Using suggested filename: {pdf_filename}")
-
-            # Create a temporary YAML file for processing with unique name based on request_id
-            # Use a timestamp to ensure uniqueness even if the same request_id is used multiple times
-            timestamp = int(time.time())
-            temp_yaml_path = os.path.abspath(f"temp_tailored_cv_{request_id}_{timestamp}.yaml")
+            # Create a temporary YAML file for processing
+            temp_yaml_path = os.path.abspath(f"temp_tailored_cv_{request_id}.yaml")
             save_yaml(tailored_cv, temp_yaml_path)
-            print(f"Saved temporary YAML file for request {request_id}: {temp_yaml_path}")
 
             # Generate PDF
             success = render_cv(temp_yaml_path, output_pdf=pdf_filename)
@@ -819,14 +449,12 @@ def process_queue():
             # Remove the temporary YAML file after PDF generation
             if os.path.exists(temp_yaml_path):
                 os.remove(temp_yaml_path)
-                print(f"Removed temporary YAML file for request {request_id}: {temp_yaml_path}")
 
             # Clean up the rendercv_output directory if it exists
             rendercv_output_dir = os.path.join(os.path.dirname(temp_yaml_path), "rendercv_output")
             if os.path.exists(rendercv_output_dir):
                 try:
                     shutil.rmtree(rendercv_output_dir)
-                    print(f"Cleaned up {rendercv_output_dir}")
                 except Exception as e:
                     print(f"Warning: Could not remove rendercv_output directory: {e}")
 
@@ -871,7 +499,7 @@ def run_server(port=5000):
 
     print("Started worker thread and stale request checker thread")
 
-    app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=port, debug=True)
 
 if __name__ == "__main__":
     import sys

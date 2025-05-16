@@ -693,6 +693,12 @@ function testApiKey() {
     return;
   }
 
+  // Validate API key format
+  if (!apiKey.startsWith('sk-or-')) {
+    statusElement.innerHTML = '<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Invalid API key format. OpenRouter keys should start with "sk-or-"</span>';
+    return;
+  }
+
   statusElement.innerHTML = '<span style="color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Testing API key...</span>';
 
   // Use the tailor service to test the API key
@@ -713,8 +719,32 @@ function testApiKey() {
   })
   .then(data => {
     if (data.success) {
+      // Save the API key to storage immediately after successful validation
+      chrome.storage.sync.get({
+        tailorSettings: {
+          openrouterApiKey: '',
+          tailorPrompt: getDefaultTailorPrompt()
+        }
+      }, (items) => {
+        const updatedSettings = {
+          tailorSettings: {
+            ...items.tailorSettings,
+            openrouterApiKey: apiKey
+          }
+        };
+
+        chrome.storage.sync.set(updatedSettings, () => {
+          console.log('API key saved to storage after successful validation');
+        });
+      });
+
       if (data.has_deepseek) {
         statusElement.innerHTML = '<span style="color: var(--success-color);"><i class="fas fa-check-circle"></i> API key is valid and DeepSeek model is available</span>';
+
+        // Show additional message if config was saved on the server
+        if (data.config_saved) {
+          statusElement.innerHTML += '<br><span style="color: var(--success-color);"><i class="fas fa-info-circle"></i> API key has been updated on the server</span>';
+        }
       } else {
         statusElement.innerHTML = '<span style="color: var(--warning-color);"><i class="fas fa-exclamation-circle"></i> API key is valid but DeepSeek model not found</span>';
       }
@@ -1001,6 +1031,18 @@ document.addEventListener('DOMContentLoaded', () => {
     testApiKeyButton.addEventListener('click', testApiKey);
   }
 
+  // Add event listener for restart tailor service button
+  const restartTailorServiceButton = document.getElementById('restart-tailor-service');
+  if (restartTailorServiceButton) {
+    restartTailorServiceButton.addEventListener('click', restartTailorService);
+  }
+
+  // Add event listener for check config button
+  const checkConfigButton = document.getElementById('check-config');
+  if (checkConfigButton) {
+    checkConfigButton.addEventListener('click', checkCurrentConfig);
+  }
+
   // Add event listener for reset prompt button
   const resetPromptButton = document.getElementById('reset-prompt');
   if (resetPromptButton) {
@@ -1087,6 +1129,155 @@ Job Description:
 {job_description}
 
 Output the tailored CV in YAML format with the exact same structure and order as the original, plus the filename field at the top.`;
+}
+
+// Function to check the current configuration
+function checkCurrentConfig() {
+  const statusElement = document.getElementById('api-key-status');
+  const configStatusElement = document.getElementById('config-status');
+  const configPreElement = configStatusElement.querySelector('pre');
+
+  statusElement.innerHTML = '<span style="color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Checking current configuration...</span>';
+
+  // Call the config-status endpoint
+  fetch('http://localhost:5000/config-status')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Server returned status ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      if (data.success) {
+        // Format the configuration data
+        const configData = data.config;
+        const formattedConfig = JSON.stringify(configData, null, 2);
+
+        // Display the configuration
+        configPreElement.textContent = formattedConfig;
+        configStatusElement.style.display = 'block';
+
+        // Update status
+        statusElement.innerHTML = '<span style="color: var(--success-color);"><i class="fas fa-check-circle"></i> Configuration retrieved successfully</span>';
+
+        // Check for potential issues
+        let warnings = [];
+
+        if (!configData.api_key_valid_format) {
+          warnings.push("API key format is invalid (should start with 'sk-or-')");
+        }
+
+        if (configData.api_key_length < 20) {
+          warnings.push("API key length seems too short");
+        }
+
+        if (!configData.model.includes('deepseek')) {
+          warnings.push("Model does not appear to be a DeepSeek model");
+        }
+
+        // Display warnings if any
+        if (warnings.length > 0) {
+          const warningsList = warnings.map(w => `<li>${w}</li>`).join('');
+          statusElement.innerHTML += `<br><span style="color: var(--warning-color);"><i class="fas fa-exclamation-triangle"></i> Potential issues detected:</span><ul style="color: var(--warning-color); margin-top: 5px;">${warningsList}</ul>`;
+        }
+
+        // Clear the status message after a delay (but keep the config display)
+        setTimeout(() => {
+          statusElement.innerHTML = '';
+        }, 5000);
+      } else {
+        throw new Error(data.message || 'Failed to retrieve configuration');
+      }
+    })
+    .catch(error => {
+      console.error('Error checking configuration:', error);
+
+      // Check if the error might be related to the server not running
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        statusElement.innerHTML = '<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Could not connect to tailor service. Make sure it is running at http://localhost:5000</span>';
+      } else {
+        statusElement.innerHTML = `<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Error: ${error.message}</span>`;
+      }
+
+      // Hide the config status element
+      configStatusElement.style.display = 'none';
+    });
+}
+
+// Function to restart the tailor service
+function restartTailorService() {
+  const statusElement = document.getElementById('api-key-status');
+  statusElement.innerHTML = '<span style="color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Restarting tailor service...</span>';
+
+  // Get the current API key
+  const apiKey = document.getElementById('openrouterApiKey').value.trim();
+
+  // First, update the configuration with the current API key
+  fetch('http://localhost:5000/config', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      openrouter_api_key: apiKey
+    })
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`Server returned status ${response.status}`);
+    }
+    return response.json();
+  })
+  .then(data => {
+    if (data.success) {
+      // Now, call a special restart endpoint
+      return fetch('http://localhost:5000/restart', {
+        method: 'POST'
+      });
+    } else {
+      throw new Error(data.message || 'Failed to update configuration');
+    }
+  })
+  .then(response => {
+    // The server might have restarted, so we might not get a response
+    if (response && response.ok) {
+      return response.json();
+    } else {
+      // If we don't get a response, assume the server is restarting
+      return { success: true, message: 'Tailor service is restarting' };
+    }
+  })
+  .then(data => {
+    statusElement.innerHTML = '<span style="color: var(--success-color);"><i class="fas fa-check-circle"></i> Tailor service restarted successfully</span>';
+
+    // If we have configuration data, display it
+    if (data.config) {
+      const configStatusElement = document.getElementById('config-status');
+      const configPreElement = configStatusElement.querySelector('pre');
+
+      // Format the configuration data
+      const formattedConfig = JSON.stringify(data.config, null, 2);
+
+      // Display the configuration
+      configPreElement.textContent = formattedConfig;
+      configStatusElement.style.display = 'block';
+    }
+
+    // Clear the message after a delay
+    setTimeout(() => {
+      statusElement.innerHTML = '';
+    }, 3000);
+  })
+  .catch(error => {
+    console.error('Error restarting tailor service:', error);
+
+    // Check if the error might be related to the server restarting
+    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+      statusElement.innerHTML = '<span style="color: var(--warning-color);"><i class="fas fa-exclamation-circle"></i> Tailor service may be restarting. Please wait a moment and try again.</span>';
+    } else {
+      statusElement.innerHTML = `<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Error: ${error.message}</span>`;
+    }
+  });
 }
 
 // Function to reset the tailor prompt to default

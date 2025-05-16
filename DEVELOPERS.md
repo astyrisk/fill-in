@@ -51,10 +51,12 @@ python run_tests.py
 - [x] user should be able to control tailor's prompt
 - [x] import/export settings and jobs
 - [x] option to reset all jobs and settings.
-- [ ] test api key validation
-- [ ] tutorial on how to use the extension
+- [x] archive/apply/pin/unpin shouldn't render the whole UI
+- [ ] api key not working
+- [ ] fix the tailor
 - [x] unify tests
 - [x] separate it to a normal wiki and developer wiki
+- [ ] tutorial on how to use the extension
 
 ### 0.3.0
 - [ ] how to deal with jobs without date information

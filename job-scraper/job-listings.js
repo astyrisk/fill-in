@@ -660,7 +660,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Reset scraped details flags
                 detailsScraped: false,
-                isScrapingDetails: false
+                isScrapingDetails: false,
+
+                // Preserve tailoring status if it exists
+                tailoringStatus: jobToUnarchive.tailoringStatus,
+                tailoredCvFilename: jobToUnarchive.tailoredCvFilename,
+                tailorRequestId: jobToUnarchive.tailorRequestId
             };
 
             // Initialize target country if it doesn't exist
@@ -686,13 +691,67 @@ document.addEventListener('DOMContentLoaded', () => {
             }, () => {
                 console.log(`Unarchived job ${jobId} from Archive to ${targetCountry}`);
 
-                // Remove the job element from the DOM if provided
-                if (jobElement && jobElement.parentNode) {
-                    jobElement.parentNode.removeChild(jobElement);
-                }
+                // Clear the cache since we've modified job data
+                jobCache.clear();
 
-                // Update the job count in the UI
-                updateJobCountDisplay(updatedAllJobs.length);
+                // Get the selected country
+                const selectedCountry = countrySelect.value;
+
+                // Handle UI update based on the active tab
+                if (jobElement) {
+                    // Check if the job should be visible in the current tab
+                    if (isJobVisibleInCurrentTab(unarchivedJob) &&
+                        (selectedCountry === targetCountry || selectedCountry === 'all')) {
+
+                        // Create a new job card for the unarchived job
+                        const newJobCard = createJobCard(unarchivedJob);
+
+                        // Find the appropriate date category section
+                        const categoryName = findDateCategoryForJob(unarchivedJob);
+                        const categoryContent = document.querySelector(`.date-category-header.${categoryName.toLowerCase().replace(/\s+/g, '-')}`)?.parentNode?.querySelector('.date-category-content');
+
+                        if (categoryContent) {
+                            // Add the new job card to the appropriate category
+                            categoryContent.appendChild(newJobCard);
+
+                            // Update the category count
+                            updateDateCategoryCount(categoryName);
+
+                            // Add a highlight effect to the new card
+                            newJobCard.classList.add('highlight-effect');
+                            setTimeout(() => {
+                                newJobCard.classList.remove('highlight-effect');
+                            }, 500);
+                        } else {
+                            // If the category doesn't exist, we need to refresh the whole list
+                            filterJobListings();
+                        }
+                    } else {
+                        // If we're in the Archive tab or the selected country doesn't match,
+                        // remove the job card with animation
+                        if (jobElement.parentNode) {
+                            // Add a fade-out animation
+                            jobElement.classList.add('fade-out');
+
+                            // Remove the element after animation completes
+                            setTimeout(() => {
+                                if (jobElement.parentNode) {
+                                    const categoryName = findDateCategoryForJob(jobToUnarchive);
+                                    jobElement.parentNode.removeChild(jobElement);
+
+                                    // Update the category count
+                                    updateDateCategoryCount(categoryName);
+                                }
+                            }, 300); // Match this to the CSS animation duration
+                        }
+                    }
+
+                    // Update the job count display without refreshing the entire list
+                    updateJobCountDisplay();
+                } else {
+                    // If no job element is provided, refresh the whole list
+                    filterJobListings();
+                }
 
                 // Update the country dropdown with new job counts
                 populateCountryDropdown();
@@ -701,7 +760,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Function to archive a single job (move to Archive country)
-    function archiveSingleJob(jobId, country, _jobElement) { // Parameter kept for API compatibility but not used
+    function archiveSingleJob(jobId, country, jobElement) {
         // Don't archive if the job is already in Archive
         if (country === 'Archive') {
             alert('This job is already archived');
@@ -742,7 +801,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Reset scraped details flags
                 detailsScraped: false,
-                isScrapingDetails: false
+                isScrapingDetails: false,
+
+                // Preserve tailoring status if it exists
+                tailoringStatus: jobToArchive.tailoringStatus,
+                tailoredCvFilename: jobToArchive.tailoredCvFilename,
+                tailorRequestId: jobToArchive.tailorRequestId
 
                 // Note: All other fields like description, skills, convertedDate, etc. will be omitted
             };
@@ -775,9 +839,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Clear the cache since we've modified job data
                 jobCache.clear();
 
-                // Instead of just removing the job element, refresh the job listings
-                // to ensure the UI is properly updated
-                filterJobListings();
+                // Handle UI update based on the active tab
+                if (jobElement) {
+                    // Check if the job should be visible in the current tab
+                    if (isJobVisibleInCurrentTab(archivedJob)) {
+                        // Create a new job card for the archived job
+                        const newJobCard = createJobCard(archivedJob);
+
+                        // Find the appropriate date category section
+                        const categoryName = findDateCategoryForJob(archivedJob);
+                        const categoryContent = document.querySelector(`.date-category-header.${categoryName.toLowerCase().replace(/\s+/g, '-')}`)?.parentNode?.querySelector('.date-category-content');
+
+                        if (categoryContent) {
+                            // Add the new job card to the appropriate category
+                            categoryContent.appendChild(newJobCard);
+
+                            // Update the category count
+                            updateDateCategoryCount(categoryName);
+
+                            // Add a highlight effect to the new card
+                            newJobCard.classList.add('highlight-effect');
+                            setTimeout(() => {
+                                newJobCard.classList.remove('highlight-effect');
+                            }, 500);
+                        } else {
+                            // If the category doesn't exist, we need to refresh the whole list
+                            filterJobListings();
+                        }
+                    } else {
+                        // If we're in any other tab, remove the job card with animation
+                        if (jobElement.parentNode) {
+                            // Add a fade-out animation
+                            jobElement.classList.add('fade-out');
+
+                            // Remove the element after animation completes
+                            setTimeout(() => {
+                                if (jobElement.parentNode) {
+                                    const categoryName = findDateCategoryForJob(jobToArchive);
+                                    jobElement.parentNode.removeChild(jobElement);
+
+                                    // Update the category count
+                                    updateDateCategoryCount(categoryName);
+                                }
+                            }, 300); // Match this to the CSS animation duration
+                        }
+                    }
+
+                    // Update the job count display without refreshing the entire list
+                    updateJobCountDisplay();
+                } else {
+                    // If no job element is provided, refresh the whole list
+                    filterJobListings();
+                }
 
                 // Update the country dropdown with new job counts
                 populateCountryDropdown();
@@ -923,14 +1036,168 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Function to update the job count display
+    // Function to update the job count display without refreshing the entire list
     function updateJobCountDisplay() {
-        // Instead of updating the count directly, call filterJobListings to ensure consistent display
-        filterJobListings();
+        // Get the active tab
+        const activeTab = document.querySelector('.tab.active');
+        const activeTabId = activeTab ? activeTab.getAttribute('data-tab') : 'unapplied-jobs';
+        const searchTerm = searchInput.value.toLowerCase();
+        const selectedCountry = countrySelect.value;
+
+        chrome.storage.local.get(['linkedInJobsByCountry'], (data) => {
+            let totalJobCount = 0;
+
+            if (data.linkedInJobsByCountry && Object.keys(data.linkedInJobsByCountry).length > 0) {
+                // Calculate total job count across all countries (excluding Archive unless it's selected)
+                Object.entries(data.linkedInJobsByCountry).forEach(([country, countryJobs]) => {
+                    // Only include Archive country in the count if it's specifically selected or we're on the Archive tab
+                    if (country !== 'Archive' || activeTabId === 'archive-jobs' || selectedCountry === 'Archive') {
+                        totalJobCount += countryJobs.length;
+                    }
+                });
+            }
+
+            // Get the current visible job count
+            const visibleJobCount = document.querySelectorAll('.job-card').length;
+
+            // Update status text with filter information
+            let statusText = `Showing ${visibleJobCount} of ${totalJobCount} jobs`;
+
+            // Add country information - for Archive tab, always show 'Archive' regardless of dropdown
+            if (activeTabId === 'archive-jobs') {
+                statusText += ` in Archive`;
+            } else if (selectedCountry) {
+                statusText += ` in ${selectedCountry}`;
+            }
+
+            // Add tab information
+            if (activeTabId === 'unapplied-jobs') {
+                statusText += " (not applied)";
+            } else if (activeTabId === 'applied-jobs') {
+                statusText += " (applied)";
+            } else if (activeTabId === 'archive-jobs') {
+                statusText += " (archived)";
+            }
+
+            if (searchTerm) {
+                statusText += ` (filtered by "${searchTerm}")`;
+            }
+
+            scrapeInfo.textContent = statusText;
+        });
     }
 
     // Cache for highlight words to avoid repeated storage lookups
     let cachedHighlightWords = null;
+
+    // Helper function to check if a job should be visible in the current tab
+    // This function is used to determine if a job should be visible in the current tab
+    // when implementing partial UI updates
+    function isJobVisibleInCurrentTab(job) {
+        const activeTab = document.querySelector('.tab.active');
+        const activeTabId = activeTab ? activeTab.getAttribute('data-tab') : 'unapplied-jobs';
+
+        // Check if the job should be visible based on the active tab
+        if (activeTabId === 'unapplied-jobs') {
+            return !job.isApplied && job.country !== 'Archive';
+        } else if (activeTabId === 'applied-jobs') {
+            return job.isApplied && job.country !== 'Archive';
+        } else if (activeTabId === 'archive-jobs') {
+            return job.country === 'Archive';
+        }
+
+        return true; // Default case
+    }
+
+    // Helper function to update date category counts
+    function updateDateCategoryCount(categoryName) {
+        const categoryHeader = document.querySelector(`.date-category-header.${categoryName.toLowerCase().replace(/\s+/g, '-')}`);
+        if (categoryHeader) {
+            const countElement = categoryHeader.querySelector('.date-category-count');
+            if (countElement) {
+                const jobCards = categoryHeader.parentNode.querySelector('.date-category-content').querySelectorAll('.job-card');
+                countElement.textContent = jobCards.length;
+
+                // If there are no jobs left in this category, hide the section
+                if (jobCards.length === 0) {
+                    categoryHeader.parentNode.style.display = 'none';
+                } else {
+                    categoryHeader.parentNode.style.display = '';
+                }
+            }
+        }
+    }
+
+    // Helper function to find the appropriate date category for a job
+    function findDateCategoryForJob(job) {
+        // First check if the job is pinned
+        if (job.isPinned) {
+            return 'pinned';
+        }
+
+        // Get current date for comparison
+        const now = new Date();
+
+        // Try to get the job date
+        let jobDate = null;
+
+        // First try to use convertedDate if available
+        if (job.convertedDate && job.convertedDate.isoDate) {
+            jobDate = new Date(job.convertedDate.isoDate);
+        }
+        // If not, try to parse from postingDate
+        else if (job.postingDate) {
+            // Try to extract a date from the posting date string
+            const dateMatch = job.postingDate.match(/(\d+)\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months)/i);
+            if (dateMatch) {
+                const amount = parseInt(dateMatch[1]);
+                const unit = dateMatch[2].toLowerCase();
+
+                // Create a new date and subtract the appropriate amount
+                jobDate = new Date();
+
+                if (unit.includes('minute')) {
+                    jobDate.setMinutes(jobDate.getMinutes() - amount);
+                } else if (unit.includes('hour')) {
+                    jobDate.setHours(jobDate.getHours() - amount);
+                } else if (unit.includes('day')) {
+                    jobDate.setDate(jobDate.getDate() - amount);
+                } else if (unit.includes('week')) {
+                    jobDate.setDate(jobDate.getDate() - (amount * 7));
+                } else if (unit.includes('month')) {
+                    jobDate.setMonth(jobDate.getMonth() - amount);
+                }
+            }
+        }
+
+        // If we couldn't determine a date, put in "older" category
+        if (!jobDate) {
+            return 'older';
+        }
+
+        // Calculate time difference in milliseconds
+        const timeDiff = now.getTime() - jobDate.getTime();
+
+        // 24 hours in milliseconds
+        const hours24 = 24 * 60 * 60 * 1000;
+
+        // 7 days in milliseconds
+        const week = 7 * 24 * 60 * 60 * 1000;
+
+        // 30 days in milliseconds
+        const month = 30 * 24 * 60 * 60 * 1000;
+
+        // Categorize based on time difference
+        if (timeDiff <= hours24) {
+            return 'past24Hours';
+        } else if (timeDiff <= week) {
+            return 'pastWeek';
+        } else if (timeDiff <= month) {
+            return 'pastMonth';
+        } else {
+            return 'older';
+        }
+    }
 
     // Function to highlight specified words in text
     function highlightExperienceWord(text) {
@@ -1846,7 +2113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Legacy functions have been replaced by optimized versions in renderJobListingsOptimized
 
     // Function to pin a job
-    function pinJob(jobId, country) {
+    function pinJob(jobId, country, jobElement) {
         // Don't allow pinning archived jobs
         if (country === 'Archive') {
             console.log('Cannot pin archived job');
@@ -1864,6 +2131,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const jobIndex = countryJobs.findIndex(job => job.jobId === jobId);
             if (jobIndex === -1) return;
 
+            // Get a copy of the job before updating
+            const jobBeforeUpdate = { ...countryJobs[jobIndex] };
+
             // Update the job with isPinned flag
             countryJobs[jobIndex].isPinned = true;
 
@@ -1877,14 +2147,86 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Clear the cache since we've modified job data
                 jobCache.clear();
 
-                // Refresh the job listings to show the pinned job at the top
-                filterJobListings();
+                // If we have a job element, update it without refreshing the whole list
+                if (jobElement) {
+                    // Add the pinned class to the job card
+                    jobElement.classList.add('pinned');
+
+                    // Add the pinned badge if not already present
+                    const badgesContainer = jobElement.querySelector('.job-badges');
+                    if (badgesContainer && !jobElement.querySelector('.job-badge.pinned')) {
+                        const pinnedBadge = document.createElement('span');
+                        pinnedBadge.className = 'job-badge pinned';
+                        pinnedBadge.textContent = 'Pinned';
+                        // Insert at the beginning of the badges container
+                        badgesContainer.insertBefore(pinnedBadge, badgesContainer.firstChild);
+                    }
+
+                    // Replace the pin button with unpin button
+                    const pinBtn = jobElement.querySelector('.job-pin-button:not(.job-unpin-button)');
+                    if (pinBtn) {
+                        const unpinBtn = document.createElement('button');
+                        unpinBtn.className = 'job-pin-button job-pin-corner job-unpin-button';
+                        unpinBtn.setAttribute('data-job-id', jobId);
+                        unpinBtn.setAttribute('data-job-country', country);
+                        unpinBtn.setAttribute('title', 'Unpin this job');
+                        unpinBtn.innerHTML = '<i class="fas fa-thumbtack fa-rotate-90"></i>';
+
+                        // Add click event to the new button
+                        unpinBtn.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            const jobId = this.getAttribute('data-job-id');
+                            const country = this.getAttribute('data-job-country');
+                            unpinJob(jobId, country, jobElement);
+                        });
+
+                        // Replace the button
+                        pinBtn.parentNode.replaceChild(unpinBtn, pinBtn);
+                    }
+
+                    // Add a highlight effect to indicate the job is now pinned
+                    jobElement.classList.add('highlight-effect');
+                    setTimeout(() => {
+                        jobElement.classList.remove('highlight-effect');
+                    }, 500);
+
+                    // Move the job card to the pinned section
+                    const oldCategoryName = findDateCategoryForJob(jobBeforeUpdate);
+                    const oldCategoryContent = document.querySelector(`.date-category-header.${oldCategoryName.toLowerCase().replace(/\s+/g, '-')}`)?.parentNode?.querySelector('.date-category-content');
+
+                    // Get the pinned section
+                    const pinnedContent = document.querySelector('.date-category-header.pinned')?.parentNode?.querySelector('.date-category-content');
+
+                    if (oldCategoryContent && pinnedContent) {
+                        // Remove the job card from its current category
+                        oldCategoryContent.removeChild(jobElement);
+
+                        // Update the old category count
+                        updateDateCategoryCount(oldCategoryName);
+
+                        // Add the job card to the pinned category
+                        pinnedContent.appendChild(jobElement);
+
+                        // Update the pinned category count
+                        updateDateCategoryCount('pinned');
+                    } else {
+                        // If we can't find the sections, refresh the whole list
+                        filterJobListings();
+                        return;
+                    }
+
+                    // Update the job count display without refreshing the entire list
+                    updateJobCountDisplay();
+                } else {
+                    // Refresh the job listings if no element provided
+                    filterJobListings();
+                }
             });
         });
     }
 
     // Function to unpin a job
-    function unpinJob(jobId, country) {
+    function unpinJob(jobId, country, jobElement) {
         // Don't allow unpinning archived jobs
         if (country === 'Archive') {
             console.log('Cannot unpin archived job');
@@ -1915,8 +2257,80 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Clear the cache since we've modified job data
                 jobCache.clear();
 
-                // Refresh the job listings
-                filterJobListings();
+                // If we have a job element, update it without refreshing the whole list
+                if (jobElement) {
+                    // Remove the pinned class from the job card
+                    jobElement.classList.remove('pinned');
+
+                    // Remove the pinned badge if present
+                    const pinnedBadge = jobElement.querySelector('.job-badge.pinned');
+                    if (pinnedBadge) {
+                        pinnedBadge.parentNode.removeChild(pinnedBadge);
+                    }
+
+                    // Replace the unpin button with pin button
+                    const unpinBtn = jobElement.querySelector('.job-unpin-button');
+                    if (unpinBtn) {
+                        const pinBtn = document.createElement('button');
+                        pinBtn.className = 'job-pin-button job-pin-corner';
+                        pinBtn.setAttribute('data-job-id', jobId);
+                        pinBtn.setAttribute('data-job-country', country);
+                        pinBtn.setAttribute('title', 'Pin this job to top');
+                        pinBtn.innerHTML = '<i class="fas fa-thumbtack"></i>';
+
+                        // Add click event to the new button
+                        pinBtn.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            const jobId = this.getAttribute('data-job-id');
+                            const country = this.getAttribute('data-job-country');
+                            pinJob(jobId, country, jobElement);
+                        });
+
+                        // Replace the button
+                        unpinBtn.parentNode.replaceChild(pinBtn, unpinBtn);
+                    }
+
+                    // Add a highlight effect to indicate the job is now unpinned
+                    jobElement.classList.add('highlight-effect');
+                    setTimeout(() => {
+                        jobElement.classList.remove('highlight-effect');
+                    }, 500);
+
+                    // Move the job card to the appropriate date category section
+                    // First, determine the new category for the job
+                    const updatedJob = { ...countryJobs[jobIndex] };
+                    const newCategoryName = findDateCategoryForJob(updatedJob);
+
+                    // Get the pinned section
+                    const pinnedContent = document.querySelector('.date-category-header.pinned')?.parentNode?.querySelector('.date-category-content');
+
+                    // Get the new category section
+                    const newCategoryContent = document.querySelector(`.date-category-header.${newCategoryName.toLowerCase().replace(/\s+/g, '-')}`)?.parentNode?.querySelector('.date-category-content');
+
+                    if (pinnedContent && newCategoryContent) {
+                        // Remove the job card from the pinned category
+                        pinnedContent.removeChild(jobElement);
+
+                        // Update the pinned category count
+                        updateDateCategoryCount('pinned');
+
+                        // Add the job card to the new category
+                        newCategoryContent.appendChild(jobElement);
+
+                        // Update the new category count
+                        updateDateCategoryCount(newCategoryName);
+                    } else {
+                        // If we can't find the sections, refresh the whole list
+                        filterJobListings();
+                        return;
+                    }
+
+                    // Update the job count display without refreshing the entire list
+                    updateJobCountDisplay();
+                } else {
+                    // Refresh the job listings if no element provided
+                    filterJobListings();
+                }
             });
         });
     }
@@ -1933,6 +2347,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const jobIndex = countryJobs.findIndex(job => job.jobId === jobId);
             if (jobIndex === -1) return;
 
+            // Get a copy of the job before updating
+            const jobBeforeUpdate = { ...countryJobs[jobIndex] };
+
             // Update the job to mark as applied
             countryJobs[jobIndex].isApplied = true;
             countryJobs[jobIndex].appliedAt = new Date().toISOString();
@@ -1947,13 +2364,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Clear the cache since we've modified job data
                 jobCache.clear();
 
-                // Check if we should show applied jobs
-                const showAppliedJobs = document.getElementById('filter-applied')?.checked;
+                // Get a copy of the updated job
+                const updatedJob = { ...countryJobs[jobIndex] };
 
                 // If we have a job element, update it without refreshing the whole list
                 if (jobElement) {
-                    if (!showAppliedJobs) {
-                        // If we're not showing applied jobs, remove the job card from view
+                    // Check if the job should be visible in the current tab after the update
+                    const shouldBeVisible = isJobVisibleInCurrentTab(updatedJob);
+
+                    // If the job should not be visible in the current tab, remove it
+                    if (!shouldBeVisible) {
+                        // Remove the job card with animation
                         if (jobElement.parentNode) {
                             // Add a fade-out animation
                             jobElement.classList.add('fade-out');
@@ -1961,15 +2382,16 @@ document.addEventListener('DOMContentLoaded', () => {
                             // Remove the element after animation completes
                             setTimeout(() => {
                                 if (jobElement.parentNode) {
+                                    const categoryName = findDateCategoryForJob(jobBeforeUpdate);
                                     jobElement.parentNode.removeChild(jobElement);
 
-                                    // Update the job count in the UI
-                                    const totalJobs = document.querySelectorAll('.job-card').length;
-                                    updateJobCountDisplay(totalJobs);
+                                    // Update the category count
+                                    updateDateCategoryCount(categoryName);
                                 }
                             }, 300); // Match this to the CSS animation duration
                         }
                     } else {
+                        // The job should remain visible, update its UI
                         // Replace the applied button with unapplied button
                         const appliedBtn = jobElement.querySelector('.job-applied-button');
                         if (appliedBtn) {
@@ -2000,7 +2422,16 @@ document.addEventListener('DOMContentLoaded', () => {
                             appliedBadge.textContent = 'Applied';
                             badgesContainer.appendChild(appliedBadge);
                         }
+
+                        // Add a highlight effect to indicate the job is now applied
+                        jobElement.classList.add('highlight-effect');
+                        setTimeout(() => {
+                            jobElement.classList.remove('highlight-effect');
+                        }, 500);
                     }
+
+                    // Update the job count display without refreshing the entire list
+                    updateJobCountDisplay();
                 } else {
                     // Refresh the job listings if no element provided
                     filterJobListings();
@@ -2021,6 +2452,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const jobIndex = countryJobs.findIndex(job => job.jobId === jobId);
             if (jobIndex === -1) return;
 
+            // Get a copy of the job before updating
+            const jobBeforeUpdate = { ...countryJobs[jobIndex] };
+
             // Update the job to mark as not applied
             countryJobs[jobIndex].isApplied = false;
             delete countryJobs[jobIndex].appliedAt;
@@ -2035,41 +2469,71 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Clear the cache since we've modified job data
                 jobCache.clear();
 
+                // Get a copy of the updated job
+                const updatedJob = { ...countryJobs[jobIndex] };
+
                 // If we have a job element, update it without refreshing the whole list
                 if (jobElement) {
-                    // Add a visual highlight effect to indicate the job is now unapplied
-                    jobElement.classList.add('highlight-effect');
-                    setTimeout(() => {
-                        jobElement.classList.remove('highlight-effect');
-                    }, 500);
+                    // Check if the job should be visible in the current tab after the update
+                    const shouldBeVisible = isJobVisibleInCurrentTab(updatedJob);
 
-                    // Replace the unapplied button with applied button
-                    const unappliedBtn = jobElement.querySelector('.job-unapplied-button');
-                    if (unappliedBtn) {
-                        const appliedBtn = document.createElement('button');
-                        appliedBtn.className = 'job-applied-button';
-                        appliedBtn.setAttribute('data-job-id', jobId);
-                        appliedBtn.setAttribute('data-job-country', country);
-                        appliedBtn.setAttribute('title', 'Mark as applied');
-                        appliedBtn.innerHTML = '<i class="fas fa-check"></i>';
+                    // If the job should not be visible in the current tab, remove it
+                    if (!shouldBeVisible) {
+                        // Remove the job card with animation
+                        if (jobElement.parentNode) {
+                            // Add a fade-out animation
+                            jobElement.classList.add('fade-out');
 
-                        // Add click event to the new button
-                        appliedBtn.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            const jobId = this.getAttribute('data-job-id');
-                            const country = this.getAttribute('data-job-country');
-                            markJobAsApplied(jobId, country, jobElement);
-                        });
+                            // Remove the element after animation completes
+                            setTimeout(() => {
+                                if (jobElement.parentNode) {
+                                    const categoryName = findDateCategoryForJob(jobBeforeUpdate);
+                                    jobElement.parentNode.removeChild(jobElement);
 
-                        // Replace the button
-                        unappliedBtn.parentNode.replaceChild(appliedBtn, unappliedBtn);
+                                    // Update the category count
+                                    updateDateCategoryCount(categoryName);
+                                }
+                            }, 300); // Match this to the CSS animation duration
+                        }
+                    } else {
+                        // The job should remain visible, update its UI
+                        // Replace the unapplied button with applied button
+                        const unappliedBtn = jobElement.querySelector('.job-unapplied-button');
+                        if (unappliedBtn) {
+                            const appliedBtn = document.createElement('button');
+                            appliedBtn.className = 'job-applied-button';
+                            appliedBtn.setAttribute('data-job-id', jobId);
+                            appliedBtn.setAttribute('data-job-country', country);
+                            appliedBtn.setAttribute('title', 'Mark as applied');
+                            appliedBtn.innerHTML = '<i class="fas fa-check"></i>';
+
+                            // Add click event to the new button
+                            appliedBtn.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                const jobId = this.getAttribute('data-job-id');
+                                const country = this.getAttribute('data-job-country');
+                                markJobAsApplied(jobId, country, jobElement);
+                            });
+
+                            // Replace the button
+                            unappliedBtn.parentNode.replaceChild(appliedBtn, unappliedBtn);
+                        }
+
+                        // Remove the applied badge if present
+                        const appliedBadge = jobElement.querySelector('.job-badge.applied');
+                        if (appliedBadge) {
+                            appliedBadge.parentNode.removeChild(appliedBadge);
+                        }
+
+                        // Add a highlight effect to indicate the job is now unapplied
+                        jobElement.classList.add('highlight-effect');
+                        setTimeout(() => {
+                            jobElement.classList.remove('highlight-effect');
+                        }, 500);
                     }
 
-                    // Remove the applied badge if present
-                    const appliedBadge = jobElement.querySelector('.job-badge.applied');
-                    if (appliedBadge) {
-                        appliedBadge.parentNode.removeChild(appliedBadge);
-                    }
+                    // Update the job count display without refreshing the entire list
+                    updateJobCountDisplay();
                 } else {
                     // Refresh the job listings if no element provided
                     filterJobListings();
@@ -2456,7 +2920,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert('Archived jobs cannot be pinned or unpinned');
                     return;
                 }
-                unpinJob(jobId, country);
+                unpinJob(jobId, country, jobCard);
             }
             else if (target.classList.contains('job-pin-button')) {
                 e.preventDefault();
@@ -2468,7 +2932,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert('Archived jobs cannot be pinned or unpinned');
                     return;
                 }
-                pinJob(jobId, country);
+                pinJob(jobId, country, jobCard);
             }
         });
     }

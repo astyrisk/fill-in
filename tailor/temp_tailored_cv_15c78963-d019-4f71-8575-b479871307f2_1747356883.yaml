@@ -1,0 +1,114 @@
+cv:
+  name: Mohamed Abdelbary
+  location: Budapest, Hungary
+  email: mohammedalsaeedkamal@gmail.com
+  phone: +(36)205969179
+  social_networks:
+  - network: LinkedIn
+    username: abdelbarymohamed
+  - network: GitHub
+    username: astyrisk
+  sections:
+    summary:
+    - Fresh Computer Science graduate with expertise in **Java**, **Spring Framework**,
+      and **RESTful APIs**, seeking a role as a Java Developer.
+    education:
+    - institution: "E\xF6tv\xF6s Lor\xE1nd University"
+      area: Computer Science
+      degree: Bachelor's
+      start_date: 2021-09
+      end_date: 2025-01
+    experience:
+    - company: Ecolab
+      position: Automation Intern
+      location: Budapest, Hungary
+      start_date: 2024-05
+      end_date: 2025-01
+      highlights:
+      - Developed **Python** scripts to automate workflows within **SAP**, improving
+        efficiency.
+      - Built **GUI** software features to streamline accounting processes.
+    - company: SWVL
+      position: Software Engineer Intern
+      location: Cairo, Egypt
+      start_date: 2020-04
+      end_date: 2021-05
+      highlights:
+      - Built **RESTful APIs** with **Node.js** and **Express** for efficient data
+        management.
+      - Developed front-end components using **React** and **TypeScript**.
+    technologies:
+    - label: Languages
+      details: Java, JavaScript, Python, C, C++, Bash
+    - label: Technologies
+      details: Spring Framework, SQL, Docker, Linux, Git, React.js
+    projects:
+    - name: City Craft Game
+      date: '[source code](https://github.com/astyrisk/city-craft/)'
+      highlights:
+      - Developed a **Java Swing**-based city-building game with dynamic population
+        growth mechanics.
+      - Implemented **object-oriented** principles for modular and maintainable code.
+    - name: Markdown Web Server
+      date: '[source code](https://github.com/astyrisk/markdown-server)'
+      highlights:
+      - Built an HTTP web server in **C** that dynamically converts **Markdown** to
+        HTML.
+    - name: Cloud Storage System
+      date: '[source code](https://codeberg.org/astyrisk/file)'
+      highlights:
+      - Created a **RESTful API**-driven cloud storage solution using **Node.js**
+        and **Express**.
+    - name: Home Server
+      highlights:
+      - Configured a **Linux**-based home server with custom **Docker** images.
+    Extracurricular Activities:
+    - name: OSC, Student Activity - Kafr Elsheikh University
+      highlights:
+      - Led a team to develop **Linux** projects, including a Debian-based distribution.
+    - name: Get to Git Even - Kaft Elsheikh University
+      highlights:
+      - Conducted a workshop on **Git** and **Bash** for version control best practices.
+design:
+  theme: sb2nov
+locale:
+  language: en
+  phone_number_format: national
+  page_numbering_template: NAME - Page PAGE_NUMBER of TOTAL_PAGES
+  last_updated_date_template: Last updated in TODAY
+  date_template: MONTH_ABBREVIATION YEAR
+  month: month
+  months: months
+  year: year
+  years: years
+  present: present
+  to: "\u2013"
+  abbreviations_for_months:
+  - Jan
+  - Feb
+  - Mar
+  - Apr
+  - May
+  - June
+  - July
+  - Aug
+  - Sept
+  - Oct
+  - Nov
+  - Dec
+  full_names_of_months:
+  - January
+  - February
+  - March
+  - April
+  - May
+  - June
+  - July
+  - August
+  - September
+  - October
+  - November
+  - December
+rendercv_settings:
+  date: '2025-02-02'
+  bold_keywords: []
