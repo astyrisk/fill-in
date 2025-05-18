@@ -14,9 +14,11 @@ from flask import Flask, request, jsonify, send_file
 DEFAULT_CV_PATH = "default_cv.yaml"
 JOB_DESC_PATH = "job_description.txt"
 RAW_RESPONSE_PATH = os.path.abspath("raw_response.txt")
-# OPENROUTER_API_KEY = "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"  # Replace with your OpenRouter API key
+# Previous API keys (commented out)
+# OPENROUTER_API_KEY = "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"
 # OPENROUTER_API_KEY = "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"
-OPENROUTER_API_KEY = "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"
+# OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = "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"
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 app = Flask(__name__)
@@ -499,7 +501,7 @@ def run_server(port=5000):
 
     print("Started worker thread and stale request checker thread")
 
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)
 
 if __name__ == "__main__":
     import sys
