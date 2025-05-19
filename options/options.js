@@ -702,13 +702,15 @@ function testApiKey() {
   statusElement.innerHTML = '<span style="color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Testing API key...</span>';
 
   // Use the tailor service to test the API key
+  // Important: We set save_to_config to false to prevent overwriting the backend config
   fetch('http://localhost:5000/test-api-key', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      api_key: apiKey
+      api_key: apiKey,
+      save_to_config: false  // Don't save to backend config when testing
     })
   })
   .then(response => {
@@ -741,12 +743,33 @@ function testApiKey() {
       if (data.has_deepseek) {
         statusElement.innerHTML = '<span style="color: var(--success-color);"><i class="fas fa-check-circle"></i> API key is valid and DeepSeek model is available</span>';
 
-        // Show additional message if config was saved on the server
-        if (data.config_saved) {
-          statusElement.innerHTML += '<br><span style="color: var(--success-color);"><i class="fas fa-info-circle"></i> API key has been updated on the server</span>';
-        }
+        // Add a button to save the API key to the backend
+        statusElement.innerHTML += '<br><button id="save-api-key-to-backend" class="button">Save API Key to Backend</button>';
+
+        // Add event listener to the new button
+        setTimeout(() => {
+          const saveButton = document.getElementById('save-api-key-to-backend');
+          if (saveButton) {
+            saveButton.addEventListener('click', () => {
+              saveApiKeyToBackend(apiKey);
+            });
+          }
+        }, 0);
       } else {
         statusElement.innerHTML = '<span style="color: var(--warning-color);"><i class="fas fa-exclamation-circle"></i> API key is valid but DeepSeek model not found</span>';
+
+        // Add a button to save the API key to the backend
+        statusElement.innerHTML += '<br><button id="save-api-key-to-backend" class="button">Save API Key to Backend</button>';
+
+        // Add event listener to the new button
+        setTimeout(() => {
+          const saveButton = document.getElementById('save-api-key-to-backend');
+          if (saveButton) {
+            saveButton.addEventListener('click', () => {
+              saveApiKeyToBackend(apiKey);
+            });
+          }
+        }, 0);
       }
     } else {
       throw new Error(data.message || 'Unknown error');
@@ -754,12 +777,86 @@ function testApiKey() {
   })
   .catch(error => {
     console.error('Error testing API key:', error);
-    statusElement.innerHTML = `<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Error: ${error.message}</span>`;
+
+    // Try to extract more detailed error information
+    let errorMessage = error.message;
+
+    // If it's a server error with status 400, try to get the detailed error message
+    if (error.message.includes('Server returned status 400')) {
+      // Try to extract the detailed error message from the response
+      fetch('http://localhost:5000/test-api-key', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          api_key: apiKey,
+          save_to_config: false
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.message) {
+          statusElement.innerHTML = `<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> ${data.message}</span>`;
+        } else {
+          // Fallback to generic message
+          statusElement.innerHTML = `<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> API key validation failed</span>`;
+          statusElement.innerHTML += '<br><span style="color: var(--error-color);">The API key was rejected by OpenRouter. Please check that:</span>';
+          statusElement.innerHTML += '<br>- The API key is correct and active';
+          statusElement.innerHTML += '<br>- Your OpenRouter account has sufficient credits';
+          statusElement.innerHTML += '<br>- You have access to the DeepSeek model';
+        }
+      })
+      .catch(() => {
+        // If we can't get the detailed error, show the generic message
+        statusElement.innerHTML = `<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> API key validation failed</span>`;
+        statusElement.innerHTML += '<br><span style="color: var(--error-color);">The API key was rejected by OpenRouter. Please check that:</span>';
+        statusElement.innerHTML += '<br>- The API key is correct and active';
+        statusElement.innerHTML += '<br>- Your OpenRouter account has sufficient credits';
+        statusElement.innerHTML += '<br>- You have access to the DeepSeek model';
+      });
+    } else {
+      statusElement.innerHTML = `<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Error: ${errorMessage}</span>`;
+    }
 
     // Check if the error might be related to the tailor service not running
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
       statusElement.innerHTML += '<br><span style="color: var(--error-color);">Make sure the tailor service is running at http://localhost:5000</span>';
     }
+  });
+}
+
+// Function to save the API key to the backend
+function saveApiKeyToBackend(apiKey) {
+  const statusElement = document.getElementById('api-key-status');
+  statusElement.innerHTML = '<span style="color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Saving API key to backend...</span>';
+
+  // Use the config endpoint to save the API key
+  fetch('http://localhost:5000/config', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      openrouter_api_key: apiKey
+    })
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`Server returned status ${response.status}`);
+    }
+    return response.json();
+  })
+  .then(data => {
+    if (data.success) {
+      statusElement.innerHTML = '<span style="color: var(--success-color);"><i class="fas fa-check-circle"></i> API key saved to backend successfully</span>';
+    } else {
+      throw new Error(data.message || 'Unknown error');
+    }
+  })
+  .catch(error => {
+    console.error('Error saving API key to backend:', error);
+    statusElement.innerHTML = `<span style="color: var(--error-color);"><i class="fas fa-times-circle"></i> Error saving to backend: ${error.message}</span>`;
   });
 }
 

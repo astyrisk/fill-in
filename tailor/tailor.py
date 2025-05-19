@@ -133,20 +133,6 @@ def tailor_cv_with_deepseek(_, job_description):  # default_cv parameter not use
                 else:
                     yaml_text = tailored_cv_text
 
-                # Check if we have valid YAML content
-                if not yaml_text or yaml_text.strip() == "":
-                    print("Empty YAML content extracted")
-                    with open(RAW_RESPONSE_PATH, 'w') as f:
-                        f.write(tailored_cv_text)
-                    print(f"Raw response saved to {RAW_RESPONSE_PATH}")
-                    return None
-            except Exception as e:
-                with open(RAW_RESPONSE_PATH, 'w') as f:
-                    f.write(tailored_cv_text)
-                print(f"Could not extract YAML from response: {str(e)}. Raw response saved to {RAW_RESPONSE_PATH}")
-                return None
-
-            try:
                 # Remove any remaining code block markers if they exist
                 if yaml_text.startswith("```") or "```yaml" in yaml_text:
                     yaml_text = yaml_text.replace("```yaml", "").replace("```", "").strip()
@@ -194,7 +180,6 @@ def tailor_cv_with_deepseek(_, job_description):  # default_cv parameter not use
 
 # Step 4: Save the tailored CV
 def save_yaml(data, file_path):
-    # Simplified approach following tailor-old.py
     with open(file_path, 'w') as file:
         yaml.dump(data, file, default_flow_style=False, sort_keys=False)
     print(f"Tailored CV saved to {file_path}")
@@ -362,28 +347,6 @@ def restart_service():
     print(f"Model: {OPENROUTER_MODEL}")
     print(f"API URL: {OPENROUTER_API_URL}")
 
-    # Test the API key with a simple request
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost",
-        "X-Title": "CV Tailor Script"
-    }
-
-    try:
-        test_response = requests.get(
-            url="https://openrouter.ai/api/v1/models",
-            headers=headers,
-            timeout=5  # Add a timeout to prevent hanging
-        )
-
-        if test_response.status_code == 200:
-            print("API key validation successful during restart")
-        else:
-            print(f"API key validation failed during restart: {test_response.status_code} - {test_response.text}")
-    except Exception as e:
-        print(f"Error testing API key during restart: {str(e)}")
-
     return jsonify({
         "success": True,
         "message": "Tailor service restarted successfully",
@@ -503,10 +466,23 @@ def test_api_key():
         )
 
         if response.status_code != 200:
-            print(f"API key validation failed: {response.status_code} - {response.text}")
+            error_text = response.text
+            print(f"API key validation failed: {response.status_code} - {error_text}")
+
+            # Try to parse the error response for more details
+            error_message = "API key validation failed"
+            try:
+                error_json = response.json()
+                if 'error' in error_json and 'message' in error_json['error']:
+                    error_message = f"API key validation failed: {error_json['error']['message']}"
+            except:
+                # If we can't parse the JSON, use the raw text
+                if error_text:
+                    error_message = f"API key validation failed: {error_text}"
+
             return jsonify({
                 "success": False,
-                "message": f"API key validation failed: {response.status_code} - {response.text}"
+                "message": error_message
             }), 400
 
         # Check if DeepSeek model is available
@@ -547,37 +523,71 @@ def test_api_key():
         )
 
         if test_response.status_code != 200:
-            print(f"API key test with model failed: {test_response.status_code} - {test_response.text}")
+            error_text = test_response.text
+            print(f"API key test with model failed: {test_response.status_code} - {error_text}")
+
+            # Try to parse the error response for more details
+            error_message = "API key validation with model failed"
+            try:
+                error_json = test_response.json()
+                if 'error' in error_json and 'message' in error_json['error']:
+                    error_message = f"API key validation with model failed: {error_json['error']['message']}"
+
+                    # Add more specific guidance based on common error messages
+                    if "No auth credentials found" in error_json['error']['message']:
+                        error_message += ". Please check that your API key is correct and active."
+                    elif "insufficient_quota" in error_json['error'].get('code', ''):
+                        error_message += ". Your OpenRouter account has insufficient credits."
+                    elif "model_not_found" in error_json['error'].get('code', ''):
+                        error_message += ". The DeepSeek model is not available with your API key."
+            except:
+                # If we can't parse the JSON, use the raw text
+                if error_text:
+                    error_message = f"API key validation with model failed: {error_text}"
+
             return jsonify({
                 "success": False,
-                "message": f"API key validation with model failed: {test_response.status_code} - {test_response.text}"
+                "message": error_message
             }), 400
 
         print("API key test with model successful")
 
-        # If the API key is valid, update the configuration
+        # For testing purposes, we'll temporarily use the API key but not save it to the config file
+        # This allows the frontend to test the API key without overwriting the backend configuration
         global OPENROUTER_API_KEY
-        OPENROUTER_API_KEY = api_key
+        temp_api_key = OPENROUTER_API_KEY  # Save the current API key
+        OPENROUTER_API_KEY = api_key  # Temporarily set the new API key for testing
 
-        # Update the configuration file
-        from config import save_config
-        updated_config = config.copy()
-        updated_config['openrouter_api_key'] = api_key
+        # Check if we should save the configuration (opt-in)
+        save_to_config = data.get('save_to_config', False)
+        save_success = False
 
-        # If we found a DeepSeek model, update the model ID
-        if deepseek_model_id:
-            global OPENROUTER_MODEL
-            OPENROUTER_MODEL = deepseek_model_id
-            updated_config['model'] = deepseek_model_id
+        if save_to_config:
+            # Update the configuration file
+            from config import save_config
+            updated_config = config.copy()
+            updated_config['openrouter_api_key'] = api_key
 
-        # Save the updated configuration
-        save_success = save_config(updated_config)
+            # If we found a DeepSeek model, update the model ID
+            if deepseek_model_id:
+                global OPENROUTER_MODEL
+                OPENROUTER_MODEL = deepseek_model_id
+                updated_config['model'] = deepseek_model_id
 
-        # Log the configuration update
-        if save_success:
-            print(f"Configuration updated with new API key and model: {deepseek_model_id}")
+            # Save the updated configuration
+            save_success = save_config(updated_config)
+
+            # Log the configuration update
+            if save_success:
+                print(f"Configuration updated with new API key and model: {deepseek_model_id}")
+            else:
+                print("Failed to save configuration file with new API key")
+                # Restore the original API key if save failed
+                OPENROUTER_API_KEY = temp_api_key
         else:
-            print("Failed to save configuration file with new API key")
+            # Restore the original API key since we're not saving
+            OPENROUTER_API_KEY = temp_api_key
+            print("API key tested successfully but not saved to configuration")
 
         return jsonify({
             "success": True,

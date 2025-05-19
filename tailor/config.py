@@ -7,7 +7,8 @@ import json
 
 # Default configuration
 DEFAULT_CONFIG = {
-    "openrouter_api_key": "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",
+    # "openrouter_api_key": "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",
+    "openrouter_api_key": "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",
     "openrouter_api_url": "https://openrouter.ai/api/v1/chat/completions",
     "model": "deepseek/deepseek-chat-v3-0324:free",
     "custom_prompt": ""  # Empty string means use the default prompt in tailor.py
