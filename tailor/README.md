@@ -10,12 +10,6 @@ This is a server version of the CV Tailor script that tailors a CV based on a jo
 pip install -r requirements.txt
 ```
 
-2. Make sure you have `rendercv` installed for PDF generation:
-
-```bash
-npm install -g rendercv
-```
-
 ## Running the Server
 
 Start the server with:
@@ -64,6 +58,26 @@ Response (when `return_pdf` is `false`):
 ```
 
 When `return_pdf` is `true`, the response will be the PDF file itself.
+
+### Configuration
+
+```
+GET /config-status
+```
+
+Returns the current configuration status.
+
+```
+POST /config
+```
+
+Updates the configuration (API key, model, etc.).
+
+```
+POST /test-api-key
+```
+
+Tests if the provided OpenRouter API key is valid.
 
 ## Running as CLI
 
