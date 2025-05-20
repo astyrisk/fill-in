@@ -8,6 +8,7 @@ import queue
 import threading
 import uuid
 import time
+import copy
 from flask import Flask, request, jsonify
 from config import config
 
@@ -47,30 +48,169 @@ def get_job_description(file_path=None):
     else:
         return input("Paste the job description here:\n")
 
+# Helper function to extract only the CV section from the full YAML
+def extract_cv_section(full_yaml):
+    if not full_yaml or not isinstance(full_yaml, dict):
+        return None
+
+    # Return only the 'cv' section if it exists
+    if 'cv' in full_yaml:
+        return {'cv': full_yaml['cv']}
+    return None
+
+# Helper function to merge the tailored CV section back with the original YAML
+def merge_tailored_cv(original_yaml, tailored_cv):
+    # Create a deep copy of the original YAML to avoid modifying it
+    merged_yaml = copy.deepcopy(original_yaml)
+
+    # Debug: Log the structure of the tailored CV
+    print(f"Tailored CV structure: {type(tailored_cv)}")
+    if isinstance(tailored_cv, dict):
+        print(f"Tailored CV keys: {list(tailored_cv.keys())}")
+        if 'cv' in tailored_cv:
+            print(f"CV section keys: {list(tailored_cv['cv'].keys())}")
+
+    # If the tailored CV has a 'cv' key, use that to replace the 'cv' section
+    if tailored_cv and isinstance(tailored_cv, dict) and 'cv' in tailored_cv:
+        # Handle potential structural differences in the tailored CV
+        cv_data = tailored_cv['cv']
+
+        # Fix section/sections mismatch
+        if 'section' in cv_data and 'sections' not in cv_data:
+            print("Converting 'section' to 'sections'")
+            cv_data['sections'] = cv_data.pop('section')
+
+        # Fix other potential singular/plural mismatches
+        for key in list(cv_data.get('sections', {}).keys()):
+            # Check for singular forms that should be plural
+            singular_to_plural = {
+                'highlight': 'highlights',
+                'technology': 'technologies',
+                'detail': 'details',
+                'skill': 'skills',
+                'certification': 'certifications',
+                'project': 'projects'
+            }
+
+            if key in singular_to_plural and singular_to_plural[key] not in cv_data['sections']:
+                # Rename the key to its plural form
+                print(f"Converting '{key}' to '{singular_to_plural[key]}'")
+                cv_data['sections'][singular_to_plural[key]] = cv_data['sections'].pop(key)
+
+        # Fix highlight/highlights in experience entries
+        if 'sections' in cv_data and 'experience' in cv_data['sections']:
+            for i, exp_entry in enumerate(cv_data['sections']['experience']):
+                if isinstance(exp_entry, dict) and 'highlight' in exp_entry and 'highlights' not in exp_entry:
+                    print(f"Converting 'highlight' to 'highlights' in experience entry {i}")
+                    exp_entry['highlights'] = exp_entry.pop('highlight')
+
+        # Fix highlight/highlights in projects entries
+        if 'sections' in cv_data and 'projects' in cv_data['sections']:
+            for i, project_entry in enumerate(cv_data['sections']['projects']):
+                if isinstance(project_entry, dict) and 'highlight' in project_entry and 'highlights' not in project_entry:
+                    print(f"Converting 'highlight' to 'highlights' in project entry {i}")
+                    project_entry['highlights'] = project_entry.pop('highlight')
+
+        # Fix detail/details in technologies entries
+        if 'sections' in cv_data and 'technologies' in cv_data['sections']:
+            for i, tech_entry in enumerate(cv_data['sections']['technologies']):
+                if isinstance(tech_entry, dict) and 'detail' in tech_entry and 'details' not in tech_entry:
+                    print(f"Converting 'detail' to 'details' in technologies entry {i}")
+                    tech_entry['details'] = tech_entry.pop('detail')
+
+        # Update the merged YAML with the fixed CV data
+        merged_yaml['cv'] = cv_data
+    # If the tailored CV is the CV content directly (without the 'cv' key)
+    elif tailored_cv and isinstance(tailored_cv, dict):
+        print("Processing direct CV content (no 'cv' key)")
+
+        # Apply the same fixes to the direct CV content
+        if 'section' in tailored_cv and 'sections' not in tailored_cv:
+            print("Converting 'section' to 'sections' in direct CV content")
+            tailored_cv['sections'] = tailored_cv.pop('section')
+
+        # Fix other potential singular/plural mismatches
+        for key in list(tailored_cv.get('sections', {}).keys()):
+            singular_to_plural = {
+                'highlight': 'highlights',
+                'technology': 'technologies',
+                'detail': 'details',
+                'skill': 'skills',
+                'certification': 'certifications',
+                'project': 'projects'
+            }
+
+            if key in singular_to_plural and singular_to_plural[key] not in tailored_cv['sections']:
+                print(f"Converting '{key}' to '{singular_to_plural[key]}' in direct CV content")
+                tailored_cv['sections'][singular_to_plural[key]] = tailored_cv['sections'].pop(key)
+
+        # Fix highlight/highlights in experience entries
+        if 'sections' in tailored_cv and 'experience' in tailored_cv['sections']:
+            for i, exp_entry in enumerate(tailored_cv['sections']['experience']):
+                if isinstance(exp_entry, dict) and 'highlight' in exp_entry and 'highlights' not in exp_entry:
+                    print(f"Converting 'highlight' to 'highlights' in direct CV experience entry {i}")
+                    exp_entry['highlights'] = exp_entry.pop('highlight')
+
+        # Fix highlight/highlights in projects entries
+        if 'sections' in tailored_cv and 'projects' in tailored_cv['sections']:
+            for i, project_entry in enumerate(tailored_cv['sections']['projects']):
+                if isinstance(project_entry, dict) and 'highlight' in project_entry and 'highlights' not in project_entry:
+                    print(f"Converting 'highlight' to 'highlights' in direct CV project entry {i}")
+                    project_entry['highlights'] = project_entry.pop('highlight')
+
+        # Fix detail/details in technologies entries
+        if 'sections' in tailored_cv and 'technologies' in tailored_cv['sections']:
+            for i, tech_entry in enumerate(tailored_cv['sections']['technologies']):
+                if isinstance(tech_entry, dict) and 'detail' in tech_entry and 'details' not in tech_entry:
+                    print(f"Converting 'detail' to 'details' in direct CV technologies entry {i}")
+                    tech_entry['details'] = tech_entry.pop('detail')
+
+        merged_yaml['cv'] = tailored_cv
+
+    return merged_yaml
+
 # Step 3: Call OpenRouter API with DeepSeek V3 (free tier) to tailor the CV
 def tailor_cv_with_deepseek(_, job_description):  # default_cv parameter not used
-    # Get the original YAML string to show the exact format
-    with open(DEFAULT_CV_PATH, 'r') as file:
-        original_yaml_str = file.read()
+    # Load the full YAML file
+    full_yaml = load_yaml(DEFAULT_CV_PATH)
+    if not full_yaml:
+        print("Error loading default CV.")
+        return None
 
-    # Use the default prompt from tailor-old.py
+    # Extract only the CV section for tailoring
+    cv_section = extract_cv_section(full_yaml)
+    if not cv_section:
+        print("Error: Could not extract CV section from YAML.")
+        return None
+
+    # Convert the CV section to a string for the prompt
+    cv_section_str = yaml.dump(cv_section, default_flow_style=False, sort_keys=False)
+
+    # Use the default prompt but modified for partial CV tailoring
     prompt = (
-        "You are an expert resume writer. I have a default CV in YAML format and a job description. "
-        "Tailor the CV to match the ats important keywords and "
-        "to optimize it for ATS systems. pick the relavant projects (4 projects) and activities. "
-        "Don't add new information. "
+        "You are an expert resume writer. I have a CV in YAML format and a job description. "
+        "Tailor the CV to match the ATS important keywords and to optimize it for ATS systems. "
+        "Pick the relevant projects (4 projects). "
+        "IMPORTANT: Do NOT add any new information that is not already in the CV. The only exception is that you may add relevant skills in the skills section if they are clearly implied by the existing CV content. "
+        "Otherwise, you should only rephrase existing content to better match the job description. "
         "Return *only* the tailored CV in YAML format, with no additional text "
-        "or explanations. Ensure all 'highlights' fields are simple strings (e.g., 'GPA: 4.0/5.0'). "
-        "IMPORTANT: You must preserve the exact same order of sections and fields as in the original YAML. "
+        "or explanations. Ensure all 'highlights' fields are simple strings. "
+        "IMPORTANT: You must preserve the exact same structure and order as in the original YAML. "
         "Do not change the structure or order of the YAML, only modify the content to match the job description. "
+        "CRITICAL: Maintain the exact same key names as in the original YAML. For example, use 'sections' not 'section', "
+        "'highlights' not 'highlight', 'technologies' not 'technology', 'details' not 'detail'. "
+        "IMPORTANT FIELD NAMES: In experience entries, use 'highlights' (plural). In project entries, use 'highlights' (plural). "
+        "In technologies entries, use 'details' (plural) not 'detail'. "
         "You can change the following fields: name, date, label, details, highlights "
-        "In summary, I am a fresh graduate student, So you can start with that . "
+        "In summary, I am a fresh graduate student, so you can start with that. "
         "Use ** to make text bold as markdown syntax. "
         "Don't add any new fields. "
-        "Also, add a field called 'filename' at the very top of the YAML with a suggested filename for the CV that includes the job title, applicant and compant name. "
-        "Here is the exact format of the original YAML:\n\n" + original_yaml_str + "\n\n"
+        "Also, add a field called 'filename' at the very top of the YAML with a suggested filename for the CV that includes the job title, applicant and company name. "
+        "Here is the exact format of the original CV section:\n\n" + cv_section_str + "\n\n"
         "Job Description:\n" + job_description + "\n\n"
-        "Output the tailored CV in YAML format with the exact same structure and order as the original, plus the filename field at the top."
+        "Output the tailored CV in YAML format with the exact same structure and order as the original, plus the filename field at the top. "
+        "Be very careful with the indentation and spaces. The '-' after each field is intended. "
+        "Remember to use plural forms for section names: 'sections', 'highlights', 'technologies', 'details', etc."
     )
 
     # Log the API key being used (with partial masking for security)
@@ -151,20 +291,39 @@ def tailor_cv_with_deepseek(_, job_description):  # default_cv parameter not use
                         'sections': []
                     }
 
-                return tailored_cv
+                # Extract the filename if it exists
+                filename = None
+                if 'filename' in tailored_cv:
+                    filename = tailored_cv.pop('filename')
+
+                # Merge the tailored CV with the original full YAML structure
+                merged_yaml = merge_tailored_cv(full_yaml, tailored_cv)
+
+                # Add the filename back to the merged YAML
+                if filename:
+                    merged_yaml['filename'] = filename
+
+                return merged_yaml
             except yaml.YAMLError as e:
                 with open(RAW_RESPONSE_PATH, 'w') as f:
                     f.write(tailored_cv_text)
                 print(f"Error parsing tailored CV YAML: {e}")
                 print(f"Raw response saved to {RAW_RESPONSE_PATH}")
 
-                # Create a minimal valid structure
-                return {
-                    'filename': 'tailored_cv.pdf',
-                    'name': 'CV Parsing Error',
-                    'location': 'Error occurred while parsing the CV',
-                    'sections': []
+                # Create a minimal valid structure for the CV section
+                error_cv = {
+                    'cv': {
+                        'name': 'CV Parsing Error',
+                        'location': 'Error occurred while parsing the CV',
+                        'sections': []
+                    }
                 }
+
+                # Merge with the original structure to maintain all required keys
+                merged_yaml = merge_tailored_cv(full_yaml, error_cv)
+                merged_yaml['filename'] = 'tailored_cv.pdf'
+
+                return merged_yaml
         else:
             with open(RAW_RESPONSE_PATH, 'w') as f:
                 f.write(response.text)
@@ -249,17 +408,14 @@ def render_cv(yaml_path, output_pdf=None):
 
 # Main execution
 def main():
-    default_cv = load_yaml(DEFAULT_CV_PATH)
-    if not default_cv:
-        print("Error loading default CV.")
-        return
-
+    # We don't need to load the default CV here anymore as it's done inside tailor_cv_with_deepseek
     job_description = get_job_description(JOB_DESC_PATH)
     if not job_description:
         print("No job description provided.")
         return
 
-    tailored_cv = tailor_cv_with_deepseek(default_cv, job_description)
+    # Call the tailoring function with None as the first parameter (it's not used)
+    tailored_cv = tailor_cv_with_deepseek(None, job_description)
     if not tailored_cv:
         print("Failed to tailor CV.")
         return
@@ -295,10 +451,13 @@ def main():
     # Render the CV
     success = render_cv(temp_yaml_path, output_pdf=pdf_filename)
 
-    # Remove the temporary YAML file after PDF generation
+    # Remove the temporary YAML file after PDF creation
     if os.path.exists(temp_yaml_path):
-        os.remove(temp_yaml_path)
-        print(f"Removed temporary YAML file: {temp_yaml_path}")
+        try:
+            os.remove(temp_yaml_path)
+            print(f"Removed temporary YAML file: {temp_yaml_path}")
+        except Exception as e:
+            print(f"Warning: Could not remove temporary YAML file: {e}")
 
     # Clean up the rendercv_output directory if it exists
     rendercv_output_dir = os.path.join(os.path.dirname(temp_yaml_path), "rendercv_output")
@@ -777,17 +936,9 @@ def process_queue():
             OPENROUTER_API_URL = current_config['openrouter_api_url']
             OPENROUTER_MODEL = current_config['model']
 
-            # Load default CV
-            default_cv = load_yaml(DEFAULT_CV_PATH)
-            if not default_cv:
-                with status_lock:
-                    request_status[request_id]['status'] = 'failed'
-                    request_status[request_id]['error'] = 'Error loading default CV'
-                request_queue.task_done()
-                continue
-
-            # Tailor the CV
-            tailored_cv = tailor_cv_with_deepseek(default_cv, job_description)
+            # Tailor the CV - we don't need to load the default CV here anymore
+            # as it's done inside tailor_cv_with_deepseek
+            tailored_cv = tailor_cv_with_deepseek(None, job_description)
             if not tailored_cv:
                 with status_lock:
                     request_status[request_id]['status'] = 'failed'
@@ -826,10 +977,13 @@ def process_queue():
             # Generate PDF
             success = render_cv(temp_yaml_path, output_pdf=pdf_filename)
 
-            # Remove the temporary YAML file after PDF generation
+            # Remove the temporary YAML file after PDF creation
             if os.path.exists(temp_yaml_path):
-                os.remove(temp_yaml_path)
-                print(f"Removed temporary YAML file for request {request_id}: {temp_yaml_path}")
+                try:
+                    os.remove(temp_yaml_path)
+                    print(f"Removed temporary YAML file for request {request_id}: {temp_yaml_path}")
+                except Exception as e:
+                    print(f"Warning: Could not remove temporary YAML file: {e}")
 
             # Clean up the rendercv_output directory if it exists
             rendercv_output_dir = os.path.join(os.path.dirname(temp_yaml_path), "rendercv_output")
@@ -861,13 +1015,68 @@ def process_queue():
             request_queue.task_done()
 
         except Exception as e:
-            print(f"Error processing request: {e}")
+            error_message = str(e)
+            print(f"Error processing request: {error_message}")
+
+            # Special handling for the string subtraction error
+            if "unsupported operand type(s) for -: 'str' and 'str'" in error_message:
+                print("Detected string subtraction error - this is likely due to a structure mismatch in the YAML")
+                print("Check the structure of the tailored CV and ensure all keys match the expected format")
+                print("Specifically, check for singular/plural mismatches (e.g., 'section' vs 'sections', 'highlight' vs 'highlights')")
+
+                # Create a minimal valid structure for the CV section as a fallback
+                if 'request_id' in locals() and 'job_description' in locals():
+                    try:
+                        print("Attempting to create a fallback CV with minimal structure...")
+                        # Load the full YAML file
+                        full_yaml = load_yaml(DEFAULT_CV_PATH)
+                        if full_yaml:
+                            error_cv = {
+                                'cv': {
+                                    'name': 'CV Parsing Error',
+                                    'location': 'Error occurred while parsing the CV',
+                                    'sections': {
+                                        'summary': ['Failed to tailor CV due to structure mismatch.']
+                                    }
+                                }
+                            }
+
+                            # Merge with the original structure to maintain all required keys
+                            merged_yaml = merge_tailored_cv(full_yaml, error_cv)
+                            merged_yaml['filename'] = f'error_tailored_cv_{request_id}.pdf'
+
+                            # Create a temporary YAML file for processing
+                            timestamp = int(time.time())
+                            temp_yaml_path = os.path.abspath(f"temp_tailored_cv_{request_id}_{timestamp}.yaml")
+                            save_yaml(merged_yaml, temp_yaml_path)
+
+                            with status_lock:
+                                request_status[request_id]['status'] = 'failed'
+                                request_status[request_id]['error'] = f"Failed to tailor CV: {error_message}"
+
+                            # Try to generate a PDF with the fallback YAML
+                            fallback_pdf = f"error_tailored_cv_{request_id}.pdf"
+                            fallback_success = render_cv(temp_yaml_path, output_pdf=fallback_pdf)
+
+                            # Remove the temporary YAML file after attempting to create the PDF
+                            if os.path.exists(temp_yaml_path):
+                                try:
+                                    os.remove(temp_yaml_path)
+                                    print(f"Removed fallback YAML file: {temp_yaml_path}")
+                                except Exception as e:
+                                    print(f"Warning: Could not remove fallback YAML file: {e}")
+
+                            print(f"Created fallback PDF: {fallback_success}")
+                    except Exception as fallback_error:
+                        print(f"Failed to create fallback CV: {fallback_error}")
+
             # If we have a request_id, update its status
             if 'request_id' in locals():
                 with status_lock:
                     request_status[request_id]['status'] = 'failed'
-                    request_status[request_id]['error'] = str(e)
+                    request_status[request_id]['error'] = error_message
                 request_queue.task_done()
+
             time.sleep(1)  # Prevent tight loop in case of recurring errors
 
 def run_server(port=5000):

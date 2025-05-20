@@ -1,6 +1,6 @@
 # CV Tailor Server
 
-This is a server version of the CV Tailor script that tailors a CV based on a job description.
+This is a server version of the CV Tailor script that tailors a CV based on a job description. It implements partial CV tailoring, which only modifies selected sections of the CV while preserving the complete YAML structure.
 
 ## Installation
 
@@ -88,6 +88,24 @@ python tailor.py
 ```
 
 This will use the job description from `job_description.txt` or prompt you to enter one.
+
+## Partial CV Tailoring
+
+The CV Tailor Server implements partial CV tailoring, which:
+
+1. Extracts only the selected sections from the CV YAML structure (specifically, only content under the `cv` key)
+2. Sends only these extracted sections to the AI tailoring service (DeepSeek V3 API)
+3. When receiving the tailored content back from the API, intelligently merges this tailored content with the original, unmodified sections of the CV
+4. Preserves the complete YAML structure with all four required keys (`cv`, `design`, `locale`, and `rendercv_settings`)
+5. Renders the complete merged CV as a PDF using RenderCV
+
+This approach has several advantages:
+- Reduces the amount of data sent to the API
+- Ensures that only the CV content is modified, not the design or rendering settings
+- Maintains compatibility with RenderCV's expected YAML structure
+- Allows for more focused tailoring of just the CV content
+
+The temporary YAML files generated during the tailoring process are kept for inspection. You can find them in the tailor directory with names like `temp_tailored_cv_<request_id>_<timestamp>.yaml`.
 
 ## Example Usage with curl
 

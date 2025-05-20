@@ -9,8 +9,6 @@ cv:
     - network: "GitHub"
       username: "astyrisk"
   sections:
-    summary:
-      - "hi"
     education:
       - institution: "Eötvös Loránd University"
         area: "Computer Science"
@@ -85,7 +83,7 @@ design:
   theme: "sb2nov"
 locale:
   language: "en"
-  phone_number_format: "national"
+  phone_number_format: "international"
   page_numbering_template: "NAME - Page PAGE_NUMBER of TOTAL_PAGES"
   last_updated_date_template: "Last updated in TODAY"
   date_template: "MONTH_ABBREVIATION YEAR"

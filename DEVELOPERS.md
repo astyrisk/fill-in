@@ -52,10 +52,14 @@ python run_tests.py
 - [x] import/export settings and jobs
 - [x] option to reset all jobs and settings.
 - [x] archive/apply/pin/unpin shouldn't render the whole UI
-- [ ] api key not working
+- [x] api key not working
 - [ ] fix the tailor
+  - Only the content should be sent to deepseek, not the entire yaml format.
 - [x] unify tests
 - [x] separate it to a normal wiki and developer wiki
+- [ ] header's UI consistency
+- [ ] delete should permanently delete the job
+- [ ] undo option after actions
 - [ ] tutorial on how to use the extension
 
 ### 0.3.0
