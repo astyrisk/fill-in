@@ -1,11 +1,14 @@
 # Fill-in
 *This is a work in progress.*
 
+[![Watch the Demo Video](./media/linkedin.mp4)
+
 A chrome extension (Manifest V3) to filter related jobs from linked-in and fill in your data. I am tired of those corperate shitty forms and mentally-unstable job descriptions.
 
 The extension has two main parts:
 1. The form filler part, which fills in the form fields on the website you are on.
 2. The job scraper part, which scrapes jobs from LinkedIn and shows them in a popup. It also tailors a CV for each job.
+
 
 ## Features
 

@@ -57,6 +57,10 @@ python run_tests.py
   - Only the content should be sent to deepseek, not the entire yaml format.
 - [x] unify tests
 - [x] separate it to a normal wiki and developer wiki
+- [ ] implement select/unselect
+- [ ] fetch all jobs details button
+- [ ] implememnt freedom to move the blocks down/up by drag and drop
+- [ ] feature to copy generated pdf name
 - [ ] header's UI consistency
 - [ ] delete should permanently delete the job
 - [ ] undo option after actions
