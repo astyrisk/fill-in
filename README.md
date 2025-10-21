@@ -1,7 +1,7 @@
 # Fill-in
 *This is a work in progress.*
 
-[![Watch the Demo Video](./media/linkedin.mp4)
+![Watch the Demo Video](./media/linkedin.mp4)
 
 A chrome extension (Manifest V3) to filter related jobs from linked-in and fill in your data. I am tired of those corperate shitty forms and mentally-unstable job descriptions.
 
